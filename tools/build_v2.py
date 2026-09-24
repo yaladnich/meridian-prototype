@@ -423,8 +423,6 @@ GRAIN = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22
 CSS = r"""
 /* ===== v2 ===== */
 .dw::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;background-image:url("GRAIN");background-size:220px 220px;opacity:.38}
-a.vlk{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
-a.vlk:hover{color:var(--ink)}
 @keyframes bnU{0%{opacity:1}85%{opacity:1}to{top:0;opacity:0}}
 @keyframes bnD{0%{opacity:1}85%{opacity:1}to{top:100%;opacity:0}}
 @keyframes hsP{0%{opacity:1;transform:scaleX(0)}99%{opacity:1;transform:scaleX(1)}to{opacity:0;transform:scaleX(1)}}
@@ -1347,9 +1345,6 @@ def build(mode):
     n_order = page.count('<span class="m">Замовити</span>')
     assert n_order >= 16, n_order
     page = page.replace('<span class="m">Замовити</span>', '<span class="m">' + roll('Замовити') + '</span>')
-    link = ('<a class="vlk" href="v1.html">перша версія прототипу →</a> · <a class="vlk" href="video.html">версія з відео →</a>' if mode == 'svg'
-            else '<a class="vlk" href="./">головна →</a>')
-    page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · ' + link, page, 2)
     return page
 
 
