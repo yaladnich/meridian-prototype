@@ -1306,25 +1306,35 @@ function phoneDigits(v) {
     arcLine(cupF, 36, 17.25, chT, true); arcLine(cupF, 36, 4.05, wallV, true); arcLine(cupF, 35.2, 3.25, [Math.PI, 2 * Math.PI]);
     for (const s of [-1, 1]) sil(cupF, [P(s * 35.2, 0, 3.25), P(s * 36, 0, 4.05), P(s * 36, 0, 17.25), P(s * 35, 0, 18.25)]);
 
-    // внутрішнє кільце (конус): силует тіла, бурт, доріжка, торець з фасками, отвір
-    const cone = el('g', {}, scn);
-    const prof = [[25.4, 0], [26, .6], [25.92, 2.18], [23.5, 1.58], [20.67, 15.17], [21.95, 15.45], [21.95, 16.5], [21.45, 17], [18.3, 17], [17.5, 16.2]];
-    fill(cone, poly(hull(prof.flatMap(([r, z]) => arc(r, z, 0, 2 * Math.PI, 72))), true) + ring(17.5, .8), hex(TM), { 'fill-rule': 'evenodd' });
-    rev(cone, 25.4, 0, 26, .6, 1);
-    const ribW = rev(cone, 26, .6, 25.92, 2.18, 1);
-    rev(cone, 25.92, 2.18, 23.5, 1.58, -1, [Math.PI - 10 * DEG, 2 * Math.PI + 10 * DEG]);
-    const rw = rev(cone, 23.5, 1.58, 20.67, 15.17, 1);
-    rev(cone, 21.95, 15.45, 21.95, 16.5, 1);
-    const cTop = rev(cone, 21.95, 16.5, 21.45, 17, 1);
-    ann(cone, 18.3, 21.45, 17);
-    const bch = rev(cone, 18.3, 17, 17.5, 16.2, -1);
-    const bore = rev(cone, 17.5, 16.2, 17.5, .8, -1);
-    line(cone, ring(21.45, 17)); line(cone, ring(18.3, 17));
-    arcLine(cone, 21.95, 16.5, cTop, true); arcLine(cone, 21.95, 15.45, [Math.PI, 2 * Math.PI], true); arcLine(cone, 20.67, 15.17, rw, true);
-    arcLine(cone, 23.5, 1.58, rw, true); arcLine(cone, 25.92, 2.18, [Math.PI - 10 * DEG, 2 * Math.PI + 10 * DEG], true);
-    arcLine(cone, 26, .6, ribW, true); arcLine(cone, 25.4, 0, [Math.PI, 2 * Math.PI]);
-    arcLine(cone, 17.5, 16.2, bch, true); arcLine(cone, 17.5, .8, bore, true);
-    for (const s of [-1, 1]) sil(cone, [P(s * 25.4, 0, 0), P(s * 26, 0, .6), P(s * 25.92, 0, 2.18), P(s * 23.5, 0, 1.58), P(s * 20.67, 0, 15.17), P(s * 21.95, 0, 15.45), P(s * 21.95, 0, 16.5), P(s * 21.45, 0, 17)]);
+    // внутрішнє кільце (конус). coneW — нерухома обгортка для маски перекриття й сортування, cone рухається всередині.
+    // Зовнішні поверхні малюються знизу вгору (так вони перекривають одна одну правильно), стінка отвору — лише в межах
+    // верхнього отвору, наскрізний просвіт (перетин верхнього й нижнього отворів) лишається порожнім.
+    const coneW = el('g', {}, scn), cone = el('g', {}, coneW);
+    const lens = el('clipPath', { id: 'brl-' + id }, defs);
+    el('path', { d: 'M-3000 -3000H3000V3000H-3000Z' + poly(clipConvex(loop(17.5, 16.2), loop(17.5, .8)), true), 'clip-rule': 'evenodd' }, lens);
+    const top = el('clipPath', { id: 'bro-' + id }, defs);
+    el('path', { d: ring(18.3, 17) }, top);
+    const cb = el('g', { 'clip-path': 'url(#brl-' + id + ')' }, cone);
+    rev(cb, 25.4, 0, 26, .6, 1);
+    const ribW = rev(cb, 26, .6, 25.92, 2.18, 1);
+    const ledge = rev(cb, 25.92, 2.18, 23.5, 1.58, -1);
+    const rw = rev(cb, 23.5, 1.58, 20.67, 15.17, 1);
+    const srw = rev(cb, 21.95, 15.45, 21.95, 16.5, 1);
+    const cTop = rev(cb, 21.95, 16.5, 21.45, 17, 1);
+    ann(cb, 18.3, 21.45, 17);
+    const ci = el('g', { 'clip-path': 'url(#bro-' + id + ')' }, cb);
+    const bore = rev(ci, 17.5, 16.2, 17.5, .8, -1);
+    const bch = rev(ci, 18.3, 17, 17.5, 16.2, -1);
+    arcLine(ci, 17.5, 16.2, bch, true); arcLine(ci, 17.5, .8, bore, true);
+    line(cb, ring(21.45, 17)); line(cb, ring(18.3, 17));
+    arcLine(cb, 21.95, 16.5, cTop, true); arcLine(cb, 21.95, 15.45, srw); arcLine(cb, 20.67, 15.17, rw, true);
+    arcLine(cb, 23.5, 1.58, rw, true); arcLine(cb, 25.92, 2.18, ledge, true);
+    arcLine(cb, 26, .6, ribW, true); arcLine(cb, 25.4, 0, [Math.PI, 2 * Math.PI]);
+    for (const s of [-1, 1]) {
+      sil(cb, [P(s * 25.4, 0, 0), P(s * 26, 0, .6), P(s * 25.92, 0, 2.18)]);
+      sil(cb, [P(s * 23.5, 0, 1.58), P(s * 20.67, 0, 15.17)]);
+      sil(cb, [P(s * 21.95, 0, 15.45), P(s * 21.95, 0, 16.5), P(s * 21.45, 0, 17)]);
+    }
 
     // сепаратор: у кожного з 16 секторів верхній обід із фланцем і нижній обід — окремі шари (верх перед торцями роликів, низ за ними)
     const cageSec = [], FL = [CG.s[0] - 2.8, CG.s[1] + .3];
@@ -1372,7 +1382,7 @@ function phoneDigits(v) {
       const chf = fill(g, '', hex(TL)), cap = fill(g, '', hex(TL));
       rolls.push({ g, gr, stops, side, cap, chf, out: line(g, ''), capl: line(g, '', true), chl: line(g, '') });
     }
-    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, cageSec, bridges, rolls, vis, order: [] };
+    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, coneW, cageSec, bridges, rolls, vis, order: [] };
   }
 
   const RS = 14;
@@ -1453,14 +1463,14 @@ function phoneDigits(v) {
     S.vis.lo[0].setAttribute('d', poly(clipConvex(eTop, loop(33.1, c0)), true)); S.vis.lo[1].setAttribute('d', outside);
     const vid = S.box.dataset.id;
     const occl = (g, zhi) => { const u = 'url(#brc' + (zhi <= c0 ? 'lo' : 'in') + '-' + vid + ')'; if (g.getAttribute('clip-path') !== u) g.setAttribute('clip-path', u); };
-    occl(S.cone, 17 + q.cone);
+    occl(S.coneW, 17 + q.cone);
     S.cageSec.forEach((x) => occl(x.g, x.zhi));
     S.bridges.forEach((x) => occl(x.g, CG.w0[1]));
     const coneD = depth(0, 0, 17 + q.cone);
     const items = [
       { g: S.cupB, d: depth(0, 32.4, 3.8 + q.cup) },
       { g: S.cupF, d: depth(0, -36, 10.75 + q.cup) },
-      { g: S.cone, d: coneD },
+      { g: S.coneW, d: coneD },
     ].concat(S.cageSec);
     // перемички сепаратора
     S.bridges.forEach((b, i) => {
