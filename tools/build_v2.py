@@ -1,4 +1,4 @@
-"""Збирає головну сторінку index.html (v2) з v1.html.
+"""Збирає головну index.html (v2, підшипник у SVG) і video.html (той самий підшипник відео) з v1.html.
 
 Зміни v2: герой — слайди виробників «ч/б → кольорове фото» з виносками й рядком виробників унизу; під героєм каталог;
 «Послуги» з підшипником «креслення → рендер → відео», кроки змінюються за таймером; ізометричні іконки
@@ -955,25 +955,38 @@ SVG_CSS = r"""
 SVG_JS = r"""
 <script>
 (function () {
-  // підшипник у SVG: конічний роликопідшипник 35×72×18,25 (геометрія з моделі Blender), орто-камера 30°, три тони + контур
+  // підшипник у SVG: конічний роликопідшипник 35×72×18,25 за моделлю Blender (meridian-3d/scripts/meridian.py):
+  // орто-камера 30°, дифузне світло з тим самим напрямком і toon-шкала «темний → середній → світлий» з м'якими переходами
   const NS = 'http://www.w3.org/2000/svg';
   const DEG = Math.PI / 180, CE = Math.cos(30 * DEG), SE = Math.sin(30 * DEG), K = 10;
-  const T1 = '#ECEBE6', T2 = '#CFCEC8', T3 = '#9C9B96', PAPER = '#F1F0EB';
-  const LA = 195 * DEG, AS = LA + 90 * DEG;
-  const L3 = (() => { const v = [Math.cos(LA), Math.sin(LA), .55], n = Math.hypot(v[0], v[1], v[2]); return v.map((x) => x / n); })();
+  const TL = [236, 235, 230], TM = [207, 206, 200], TD = [156, 155, 150];
+  const LV = (() => { const v = [-0.369, -0.240, 0.898], n = Math.hypot(v[0], v[1], v[2]); return v.map((x) => x / n); })();
+  const VV = [0, -CE, SE];
   const VB = { x: -480, y: -425, w: 960, h: 660 }, CY = VB.y + VB.h / 2, ZOOM = 1.35;
   const P = (x, y, z) => [x * K, -(z * CE + y * SE) * K];
   const f1 = (v) => (Math.round(v * 10) / 10).toString();
-  const poly = (pts, close) => 'M' + pts.map((p) => f1(p[0]) + ' ' + f1(p[1])).join('L') + (close ? 'Z' : '');
-  const arc = (r, z, a0, a1, n = 56) => { const o = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push(P(r * Math.cos(a), r * Math.sin(a), z)); } return o; };
-  const ring = (r, z) => poly(arc(r, z, 0, 2 * Math.PI, 96), true);
+  const poly = (pts, close) => pts.length ? 'M' + pts.map((p) => f1(p[0]) + ' ' + f1(p[1])).join('L') + (close ? 'Z' : '') : '';
+  const arc = (r, z, a0, a1, n) => { n = n || Math.max(8, Math.round(Math.abs(a1 - a0) / (4 * DEG))); const o = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push(P(r * Math.cos(a), r * Math.sin(a), z)); } return o; };
+  const ring = (r, z) => poly(arc(r, z, 0, 2 * Math.PI, 90), true);
   const ease = (x) => x * x * (3 - 2 * x);
   const seg = (t, a, b) => ease(Math.min(1, Math.max(0, (t - a) / (b - a))));
   const depth = (x, y, z) => y * CE - z * SE;
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const mix = (a, b, k) => a.map((x, i) => x + (b[i] - x) * k);
+  const hex = (c) => '#' + c.map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
+  function tone(v) {
+    if (v <= .10) return TD;
+    if (v < .15) return mix(TD, TM, (v - .10) / .05);
+    if (v <= .55) return TM;
+    if (v < .60) return mix(TM, TL, (v - .55) / .05);
+    return TL;
+  }
 
-  // геометрія, мм (див. meridian-3d/scripts/meridian.py → build_bearing)
-  const zA = 114.7, TH = 14 * DEG, Lm = 108.7, tanT = 4.3 / Lm, L1 = Lm - 6.75, L2 = Lm + 6.75, R1 = L1 * tanT, R2 = L2 * tanT;
-  const CUP = { ro: 36, ri: 29.2, rc: 35, z0: 3.25, z1: 18.25, rw: 32.4, zw: 3.8 };
+  // геометрія, мм
+  const zA = 114.7, TH = 14 * DEG, Lm = 108.7, tanT = 4.3 / Lm, L1 = Lm - 6.75, L2 = Lm + 6.75, R1 = L1 * tanT, R2 = L2 * tanT, CH = .45;
+  const THC = Math.asin((Lm * Math.sin(TH) - 1.44) / Lm), WIN = 9.7 * DEG, PITCH = 2 * Math.PI / 16;
+  const cagePt = (L) => [L * Math.sin(THC), zA - L * Math.cos(THC)];
+  const CG = { s: cagePt(L1 - 2.2), w0: cagePt(L1 - .3), w1: cagePt(L2 + .3), e: cagePt(L2 + 1.6) };
 
   function hull(pts) {
     const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
@@ -983,16 +996,26 @@ SVG_JS = r"""
     for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
     return lo.slice(0, -1).concat(up.slice(0, -1));
   }
-  // бокова стінка тіла обертання між (r0,z0) і (r1,z1): передня половина, освітлена й тіньова частини
-  function wall(r0, z0, r1, z1) {
-    const band = (a, b) => poly(arc(r0, z0, a, b, 40).concat(arc(r1, z1, b, a, 40)), true);
-    return [[band(Math.PI, AS), T2], [band(AS, 2 * Math.PI), T3]];
-  }
   function el(tag, attrs, parent) {
     const e = document.createElementNS(NS, tag);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
     if (parent) parent.appendChild(e);
     return e;
+  }
+  // нормаль смуги тіла обертання між (r0,z0) і (r1,z1); face = 1 назовні, -1 до осі
+  function revNormal(r0, z0, r1, z1, face) {
+    let nr = z1 - z0, nz = -(r1 - r0);
+    const n = Math.hypot(nr, nz); nr /= n; nz /= n;
+    if (Math.sign(nr) !== face && Math.abs(nr) > 1e-6) { nr = -nr; nz = -nz; }
+    return [nr, nz];
+  }
+  // видима дуга (кути), де нормаль дивиться на камеру
+  function visArc(nr, nz, a0, a1) {
+    if (Math.abs(nr) < 1e-6) return nz > 0 ? [0, 2 * Math.PI] : null;
+    const s = nz * SE / (nr * CE);
+    if (nr > 0) { if (s >= 1) return [0, 2 * Math.PI]; if (s <= -1) return null; const q = Math.asin(s); return [Math.PI - q, 2 * Math.PI + q]; }
+    if (s <= -1) return [0, 2 * Math.PI]; if (s >= 1) return null;
+    const q = Math.asin(s); return [q, Math.PI - q];
   }
 
   function build(box) {
@@ -1000,79 +1023,127 @@ SVG_JS = r"""
     const clip = el('clipPath', { id: 'brv-' + id }, defs);
     const crect = el('rect', { x: VB.x - 200, y: CY, width: VB.w + 400, height: 0 }, clip);
     const lines = [], fills = [];
-    const fill = (g, d, c, extra) => { const e = el('path', Object.assign({ d, fill: c, 'clip-path': 'url(#brv-' + id + ')', class: 'fl' }, extra || {}), g); fills.push(e); return e; };
+    let gid = 0;
+    const fill = (g, d, c, extra) => { const e = el('path', Object.assign({ d, fill: c, stroke: c, 'stroke-width': .6, 'stroke-linejoin': 'round', 'clip-path': 'url(#brv-' + id + ')' }, extra || {}), g); fills.push(e); return e; };
     const line = (g, d, thin) => { const e = el('path', { d, class: 'ln' + (thin ? ' th' : ''), pathLength: 1 }, g); lines.push(e); return e; };
-
-    // кільце зовнішнє: задня частина (доріжка, видна крізь отвір) і передня (верхній торець + зовнішня стінка)
-    const cupB = el('g', {}, scn), cupF = el('g', {}, scn);
-    const opening = (g, r, z) => {
-      fill(g, poly(arc(r, z, 105 * DEG, 285 * DEG, 48), true), T3);
-      fill(g, poly(arc(r, z, 285 * DEG, 465 * DEG, 48), true), T2);
-    };
-    // доріжка видна лише між верхнім краєм і нижнім отвором; крізь нижній отвір видно деталі під кільцем
-    const wclip = el('clipPath', { id: 'brw-' + id }, defs);
-    el('path', { d: 'M-3000 -3000H3000V3000H-3000Z' + ring(CUP.rw, CUP.zw), 'clip-rule': 'evenodd' }, wclip);
-    const tclip = el('clipPath', { id: 'brt-' + id }, defs);
-    el('path', { d: ring(CUP.ri, CUP.z1) }, tclip);
-    opening(el('g', { 'clip-path': 'url(#brw-' + id + ')' }, cupB), CUP.ri, CUP.z1);
-    line(cupB, poly(arc(CUP.rw, CUP.zw, 0, Math.PI)), true).setAttribute('clip-path', 'url(#brt-' + id + ')');
-    for (const [d, c] of wall(CUP.ro, CUP.z1, CUP.ro, CUP.z0)) fill(cupF, d, c);
-    fill(cupF, ring(CUP.ro, CUP.z1) + ring(CUP.ri, CUP.z1), T1, { 'fill-rule': 'evenodd' });
-    line(cupF, ring(CUP.ro, CUP.z1)); line(cupF, ring(CUP.ri, CUP.z1)); line(cupF, ring(CUP.rc, CUP.z1), true);
-    line(cupF, poly(arc(CUP.ro, CUP.z0, Math.PI, 2 * Math.PI)));
-    line(cupF, poly([P(-CUP.ro, 0, CUP.z0), P(-CUP.ro, 0, CUP.z1)])); line(cupF, poly([P(CUP.ro, 0, CUP.z0), P(CUP.ro, 0, CUP.z1)]));
-    line(cupB, poly(arc(CUP.ri, CUP.z1 - 1.5, 20 * DEG, 160 * DEG)), true);
-
-    // кільце внутрішнє (конус): бурт, доріжка, верхній торець, отвір
-    const cone = el('g', {}, scn);
-    const bclip = el('clipPath', { id: 'brb-' + id }, defs);
-    el('path', { d: ring(17.5, 17) }, bclip);
-    fill(cone, ring(25.92, 2.18) + ring(23.5, 2.18), T1, { 'fill-rule': 'evenodd' });
-    for (const [d, c] of wall(26, 2.18, 26, .6).concat(wall(23.5, 1.58, 20.67, 15.17), wall(21.95, 15.45, 21.95, 17))) fill(cone, d, c);
-    fill(cone, ring(21.95, 17) + ring(17.5, 17), T1, { 'fill-rule': 'evenodd' });
-    opening(cone, 17.5, 17);
-    const gh = el('g', { 'clip-path': 'url(#brv-' + id + ')' }, cone);
-    fills.push(gh);
-    el('path', { d: ring(17.5, 0), fill: PAPER, 'clip-path': 'url(#brb-' + id + ')' }, gh);
-    line(cone, ring(21.95, 17)); line(cone, ring(17.5, 17)); line(cone, ring(21.45, 17), true);
-    line(cone, poly(arc(26, .6, Math.PI, 2 * Math.PI))); line(cone, poly(arc(25.92, 2.18, 0, 2 * Math.PI, 96)), true);
-    line(cone, poly(arc(23.5, 1.58, Math.PI, 2 * Math.PI)), true);
-    for (const s of [-1, 1]) {
-      line(cone, poly([P(s * 26, 0, .6), P(s * 26, 0, 2.18)]));
-      line(cone, poly([P(s * 23.5, 0, 1.58), P(s * 20.67, 0, 15.17), P(s * 21.95, 0, 15.45), P(s * 21.95, 0, 17)]));
+    // смуга тіла обертання з градієнтом тону за кутом
+    function rev(g, r0, z0, r1, z1, face, range) {
+      const [nr, nz] = revNormal(r0, z0, r1, z1, face);
+      let va = visArc(nr, nz);
+      if (!va) return null;
+      if (range) va = va[1] - va[0] >= 2 * Math.PI - 1e-6 ? range : [Math.max(va[0], range[0]), Math.min(va[1], range[1])];
+      const [a0, a1] = va, rm = (r0 + r1) / 2, stops = [];
+      for (let i = 0; i <= 48; i++) {
+        const a = a0 + (a1 - a0) * i / 48;
+        stops.push([rm * Math.cos(a) * K, tone(nr * (LV[0] * Math.cos(a) + LV[1] * Math.sin(a)) + nz * LV[2])]);
+      }
+      const xs = stops.map((s) => s[0]), x0 = Math.min(...xs), x1 = Math.max(...xs);
+      const gr = el('linearGradient', { id: 'brg-' + id + '-' + (gid++), gradientUnits: 'userSpaceOnUse', x1: f1(x0), y1: 0, x2: f1(x1 > x0 ? x1 : x0 + 1), y2: 0 }, defs);
+      stops.sort((a, b) => a[0] - b[0]).forEach((s) => el('stop', { offset: ((s[0] - x0) / (x1 - x0 || 1)).toFixed(4), 'stop-color': hex(s[1]) }, gr));
+      const d = poly(arc(r0, z0, a0, a1).concat(arc(r1, z1, a1, a0)), true);
+      fill(g, d, 'url(#' + gr.id + ')', { stroke: 'url(#' + gr.id + ')' });
+      return [a0, a1];
     }
-    line(cone, poly(arc(17.5, 0, 25 * DEG, 155 * DEG)), true);
+    const ann = (g, ri, ro, z) => fill(g, ring(ro, z) + ring(ri, z), hex(tone(LV[2])), { 'fill-rule': 'evenodd' });
+    const arcLine = (g, r, z, va, thin) => { if (va) line(g, poly(arc(r, z, va[0], va[1])), thin); };
+    const sil = (g, pts) => line(g, poly(pts));
 
-    // ролики: конічні, вісь нахилена на 14° до осі підшипника
+    // зовнішнє кільце: задня частина (доріжка й фаска отвору), передня (торець, фаски, зовнішня стінка)
+    const cupB = el('g', {}, scn), cupF = el('g', {}, scn);
+    const lip = rev(cupB, 29.2, 18.25, 28.4, 17.35, -1);
+    const race = rev(cupB, 28.4, 17.35, 32.4, 3.8, -1);
+    const tclip = el('clipPath', { id: 'brt-' + id }, defs);
+    el('path', { d: ring(29.2, 18.25) }, tclip);
+    arcLine(cupB, 28.4, 17.35, lip, true);
+    if (race) line(cupB, poly(arc(32.4, 3.8, race[0], race[1])), true).setAttribute('clip-path', 'url(#brt-' + id + ')');
+    const wallV = rev(cupF, 36, 4.05, 36, 17.25, 1);
+    const chT = rev(cupF, 36, 17.25, 35, 18.25, 1);
+    const chB = rev(cupF, 35.2, 3.25, 36, 4.05, 1);
+    ann(cupF, 29.2, 35, 18.25);
+    line(cupF, ring(35, 18.25)); line(cupF, ring(29.2, 18.25));
+    arcLine(cupF, 36, 17.25, chT, true); arcLine(cupF, 36, 4.05, wallV, true); arcLine(cupF, 35.2, 3.25, [Math.PI, 2 * Math.PI]);
+    for (const s of [-1, 1]) sil(cupF, [P(s * 35.2, 0, 3.25), P(s * 36, 0, 4.05), P(s * 36, 0, 17.25), P(s * 35, 0, 18.25)]);
+
+    // внутрішнє кільце (конус): силует тіла, бурт, доріжка, торець з фасками, отвір
+    const cone = el('g', {}, scn);
+    const prof = [[25.4, 0], [26, .6], [25.92, 2.18], [23.5, 1.58], [20.67, 15.17], [21.95, 15.45], [21.95, 16.5], [21.45, 17], [18.3, 17], [17.5, 16.2]];
+    fill(cone, poly(hull(prof.flatMap(([r, z]) => arc(r, z, 0, 2 * Math.PI, 72))), true) + ring(17.5, .8), hex(TM), { 'fill-rule': 'evenodd' });
+    rev(cone, 25.4, 0, 26, .6, 1);
+    const ribW = rev(cone, 26, .6, 25.92, 2.18, 1);
+    rev(cone, 25.92, 2.18, 23.5, 1.58, -1, [Math.PI - 10 * DEG, 2 * Math.PI + 10 * DEG]);
+    const rw = rev(cone, 23.5, 1.58, 20.67, 15.17, 1);
+    rev(cone, 21.95, 15.45, 21.95, 16.5, 1);
+    const cTop = rev(cone, 21.95, 16.5, 21.45, 17, 1);
+    ann(cone, 18.3, 21.45, 17);
+    const bch = rev(cone, 18.3, 17, 17.5, 16.2, -1);
+    const bore = rev(cone, 17.5, 16.2, 17.5, .8, -1);
+    line(cone, ring(21.45, 17)); line(cone, ring(18.3, 17));
+    arcLine(cone, 21.95, 16.5, cTop, true); arcLine(cone, 21.95, 15.45, [Math.PI, 2 * Math.PI], true); arcLine(cone, 20.67, 15.17, rw, true);
+    arcLine(cone, 23.5, 1.58, rw, true); arcLine(cone, 25.92, 2.18, [Math.PI - 10 * DEG, 2 * Math.PI + 10 * DEG], true);
+    arcLine(cone, 26, .6, ribW, true); arcLine(cone, 25.4, 0, [Math.PI, 2 * Math.PI]);
+    arcLine(cone, 17.5, 16.2, bch, true); arcLine(cone, 17.5, .8, bore, true);
+    for (const s of [-1, 1]) sil(cone, [P(s * 25.4, 0, 0), P(s * 26, 0, .6), P(s * 25.92, 0, 2.18), P(s * 23.5, 0, 1.58), P(s * 20.67, 0, 15.17), P(s * 21.95, 0, 15.45), P(s * 21.95, 0, 16.5), P(s * 21.45, 0, 17)]);
+
+    // сепаратор: 16 нерухомих секторів ободів, фланець і 16 перемичок, що обертаються; кожен — окремий шар для сортування
+    const cageSec = [];
+    for (let k = 0; k < 16; k++) {
+      const a0 = k * PITCH, a1 = a0 + PITCH, am = a0 + PITCH / 2, g = el('g', {}, scn);
+      for (const [p0, p1] of [[CG.s, CG.w0], [CG.w1, CG.e]]) {
+        const [nr, nz] = revNormal(p0[0], p0[1], p1[0], p1[1], 1);
+        const nOut = [nr * Math.cos(am), nr * Math.sin(am), nz], face = dot(nOut, VV) > 0 ? 1 : -1;
+        const c = hex(tone(dot(nOut.map((x) => x * face), LV)));
+        fill(g, poly(arc(p0[0], p0[1], a0, a1, 6).concat(arc(p1[0], p1[1], a1, a0, 6)), true), c);
+        line(g, poly(arc(p0[0], p0[1], a0, a1, 6)), true);
+        line(g, poly(arc(p1[0], p1[1], a0, a1, 6)), true);
+      }
+      cageSec.push({ g, d: depth(24 * Math.cos(am), 24 * Math.sin(am), 9) });
+    }
+    const flange = el('g', {}, scn);
+    fill(flange, ring(CG.s[0], CG.s[1]) + ring(CG.s[0] - 2.8, CG.s[1] + .3), hex(TL), { 'fill-rule': 'evenodd' });
+    line(flange, ring(CG.s[0] - 2.8, CG.s[1] + .3), true); line(flange, ring(CG.s[0], CG.s[1]), true);
+    const bridges = [];
+    for (let i = 0; i < 16; i++) { const g = el('g', {}, scn); bridges.push({ g, f: fill(g, '', hex(TM)), l: line(g, '', true) }); }
+
+    // ролики: конічні, вісь нахилена на 14°, грані з тоном за нормаллю, малий торець з фаскою
     const rolls = [];
     for (let i = 0; i < 16; i++) {
-      const g = el('g', {}, scn);
-      rolls.push({ g, side: fill(g, '', T2), shade: fill(g, '', T3), cap: fill(g, '', T1), out: line(g, ''), capl: line(g, '') });
+      const g = el('g', {}, scn), faces = [];
+      for (let j = 0; j < 16; j++) faces.push(fill(g, '', hex(TM)));
+      const chf = fill(g, '', hex(TL)), cap = fill(g, '', hex(TL));
+      rolls.push({ g, faces, cap, chf, out: line(g, ''), capl: line(g, '', true), chl: line(g, '') });
     }
-    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, rolls, order: [] };
+    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, cageSec, flange, bridges, rolls, order: [] };
   }
 
   function rollerGeo(phi, k) {
     const er = [Math.cos(phi), Math.sin(phi), 0];
     const uw = [Math.sin(TH) * er[0], Math.sin(TH) * er[1], -Math.cos(TH)];
-    const e1n = Math.hypot(uw[1], uw[0]);
-    const e1 = [uw[1] / e1n, -uw[0] / e1n, 0];
+    const m = Math.hypot(uw[1], uw[0]), e1 = [uw[1] / m, -uw[0] / m, 0];
     const e2 = [uw[1] * e1[2] - uw[2] * e1[1], uw[2] * e1[0] - uw[0] * e1[2], uw[0] * e1[1] - uw[1] * e1[0]];
     const od = [Math.cos(TH) * er[0] * k, Math.cos(TH) * er[1] * k, Math.sin(TH) * k];
+    const N = 16;
     const circ = (L, rho) => {
-      const c = [L * uw[0] + od[0], L * uw[1] + od[1], zA + L * uw[2] + od[2]], pts = [], sh = [];
-      for (let j = 0; j < 28; j++) {
-        const t = 2 * Math.PI * j / 28, ct = Math.cos(t), st = Math.sin(t);
-        const n = [ct * e1[0] + st * e2[0], ct * e1[1] + st * e2[1], ct * e1[2] + st * e2[2]];
-        const p = P(c[0] + rho * n[0], c[1] + rho * n[1], c[2] + rho * n[2]);
-        pts.push(p);
-        if (n[0] * L3[0] + n[1] * L3[1] + n[2] * L3[2] < 0) sh.push(p);
+      const c = [L * uw[0] + od[0], L * uw[1] + od[1], zA + L * uw[2] + od[2]], pts = [];
+      for (let j = 0; j < N; j++) {
+        const t = 2 * Math.PI * j / N, n = [Math.cos(t) * e1[0] + Math.sin(t) * e2[0], Math.cos(t) * e1[1] + Math.sin(t) * e2[1], Math.cos(t) * e1[2] + Math.sin(t) * e2[2]];
+        pts.push({ p: P(c[0] + rho * n[0], c[1] + rho * n[1], c[2] + rho * n[2]), n });
       }
-      return { c, pts, sh };
+      return { c, pts };
     };
-    const a = circ(L1, R1), b = circ(L2, R2);
+    const a = circ(L1 + CH, R1), b = circ(L2 - CH, R2), cap = circ(L1, R1 - CH);
+    const faces = [];
+    for (let j = 0; j < N; j++) {
+      const j2 = (j + 1) % N, n = a.pts[j].n.map((x, q) => (x + a.pts[j2].n[q]) / 2);
+      if (dot(n, VV) <= 0) { faces.push(null); continue; }
+      faces.push({ d: poly([a.pts[j].p, a.pts[j2].p, b.pts[j2].p, b.pts[j].p], true), c: hex(tone(dot(n, LV))) });
+    }
+    const capN = uw.map((x) => -x);
+    const chN = capN.map((x, q) => x * .7);
     const mid = [(a.c[0] + b.c[0]) / 2, (a.c[1] + b.c[1]) / 2, (a.c[2] + b.c[2]) / 2];
-    return { out: hull(a.pts.concat(b.pts)), shade: hull(a.sh.concat(b.sh)), cap: a.pts, capC: a.c, mid };
+    return {
+      faces, out: hull(a.pts.concat(b.pts, cap.pts).map((x) => x.p)), cap: cap.pts.map((x) => x.p), rim: a.pts.map((x) => x.p),
+      capTone: hex(tone(dot(capN, LV))), chTone: hex(tone(dot(chN, LV) + .1)), capC: cap.c, mid,
+    };
   }
 
   // пози за часом (с від кінця проявлення), цикл 8 с — як у рендері Blender
@@ -1093,24 +1164,44 @@ SVG_JS = r"""
     };
   }
 
+  function bridge(a0, a1, face) {
+    const [nr, nz] = [Math.cos(THC), Math.sin(THC)].map((x) => x * face);
+    const am = (a0 + a1) / 2, n = [nr * Math.cos(am), nr * Math.sin(am), nz];
+    if (dot(n, VV) <= 0) return null;
+    return { d: poly(arc(CG.w0[0], CG.w0[1], a0, a1, 3).concat(arc(CG.w1[0], CG.w1[1], a1, a0, 3)), true), c: hex(tone(dot(n, LV))),
+      l: poly([P(CG.w0[0] * Math.cos(a0), CG.w0[0] * Math.sin(a0), CG.w0[1]), P(CG.w1[0] * Math.cos(a0), CG.w1[0] * Math.sin(a0), CG.w1[1])]) +
+         poly([P(CG.w0[0] * Math.cos(a1), CG.w0[0] * Math.sin(a1), CG.w0[1]), P(CG.w1[0] * Math.cos(a1), CG.w1[0] * Math.sin(a1), CG.w1[1])]) };
+  }
+
   function render(S, q) {
     const s = 1 / (1 + (ZOOM - 1) * q.zoom);
     S.scn.setAttribute('transform', 'translate(0 ' + f1(CY) + ') scale(' + s.toFixed(4) + ') translate(0 ' + f1(-CY) + ')');
     const dy = (dz) => 'translate(0 ' + f1(-dz * CE * K) + ')';
     S.cupB.setAttribute('transform', dy(q.cup)); S.cupF.setAttribute('transform', dy(q.cup)); S.cone.setAttribute('transform', dy(q.cone));
+    const coneD = depth(0, 0, 17 + q.cone);
     const items = [
-      { g: S.cupB, d: depth(0, CUP.rw, CUP.zw + q.cup) },
-      { g: S.cupF, d: depth(0, -CUP.ro, 10.75 + q.cup) },
-      { g: S.cone, d: depth(0, 0, 17 + q.cone) },
-    ];
+      { g: S.cupB, d: depth(0, 32.4, 3.8 + q.cup) },
+      { g: S.cupF, d: depth(0, -36, 10.75 + q.cup) },
+      { g: S.cone, d: coneD },
+      { g: S.flange, d: coneD - .1 },
+    ].concat(S.cageSec);
+    // перемички сепаратора
+    S.bridges.forEach((b, i) => {
+      const c = q.spin + i * PITCH, a0 = c + WIN, a1 = c + PITCH - WIN, am = (a0 + a1) / 2;
+      const f = bridge(a0, a1, 1) || bridge(a0, a1, -1);
+      b.f.setAttribute('d', f ? f.d : ''); b.l.setAttribute('d', f ? f.l : '');
+      if (f) { b.f.setAttribute('fill', f.c); b.f.setAttribute('stroke', f.c); }
+      items.push({ g: b.g, d: depth(24.9 * Math.cos(am), 24.9 * Math.sin(am), 9) });
+    });
     S.geo = [];
     S.rolls.forEach((r, i) => {
       const g = rollerGeo(2 * Math.PI * i / 16 + q.spin, q.roll);
       S.geo.push(g);
-      r.side.setAttribute('d', poly(g.out, true));
+      g.faces.forEach((f, j) => { const e = r.faces[j]; e.setAttribute('d', f ? f.d : ''); if (f) { e.setAttribute('fill', f.c); e.setAttribute('stroke', f.c); } });
+      r.chf.setAttribute('d', poly(g.rim, true)); r.chf.setAttribute('fill', g.chTone); r.chf.setAttribute('stroke', g.chTone);
+      r.cap.setAttribute('d', poly(g.cap, true)); r.cap.setAttribute('fill', g.capTone); r.cap.setAttribute('stroke', g.capTone);
       r.out.setAttribute('d', poly(g.out, true));
-      r.shade.setAttribute('d', g.shade.length > 2 ? poly(g.shade, true) : '');
-      r.cap.setAttribute('d', poly(g.cap, true));
+      r.chl.setAttribute('d', poly(g.rim, true));
       r.capl.setAttribute('d', poly(g.cap, true));
       items.push({ g: r.g, d: depth(g.mid[0], g.mid[1], g.mid[2]) });
     });
@@ -1121,10 +1212,10 @@ SVG_JS = r"""
     const near = S.geo.reduce((best, g, i) => { const a = Math.atan2(g.capC[1], g.capC[0]); const d = Math.abs(Math.atan2(Math.sin(a - 150 * DEG), Math.cos(a - 150 * DEG))); return d < best.d ? { d, i } : best; }, { d: 9, i: 0 });
     const cc = S.geo[near.i].capC;
     const A = {
-      cupF: toBox(P(CUP.ro * Math.cos(300 * DEG), CUP.ro * Math.sin(300 * DEG), 10.75), q.cup),
-      cupT: toBox(P(32.6 * Math.cos(62 * DEG), 32.6 * Math.sin(62 * DEG), CUP.z1), q.cup),
+      cupF: toBox(P(36 * Math.cos(300 * DEG), 36 * Math.sin(300 * DEG), 10.75), q.cup),
+      cupT: toBox(P(32.6 * Math.cos(62 * DEG), 32.6 * Math.sin(62 * DEG), 18.25), q.cup),
       roll: toBox(P(cc[0], cc[1], cc[2]), 0),
-      cone: toBox(P(19.7 * Math.cos(245 * DEG), 19.7 * Math.sin(245 * DEG), 17), q.cone),
+      cone: toBox(P(19.9 * Math.cos(245 * DEG), 19.9 * Math.sin(245 * DEG), 17), q.cone),
     };
     S.box.querySelectorAll('.ca').forEach((w) => {
       const [x, y] = A[w.dataset.a];
@@ -1136,18 +1227,25 @@ SVG_JS = r"""
   document.querySelectorAll('.sgb').forEach((box) => {
     const S = build(box), sec = box.closest('.sv');
     render(S, pose(0));
-    let t0 = null, raf = 0, on = true, loop = 0, last = 0;
+    let t0 = null, raf = 0, on = true, loop = 0, last = 0, still = null;
     const DRAW = [.2, 1.8], REV = [1.8, 2.9];
+    const reveal = () => {
+      if (S.done) return;
+      S.done = true;
+      S.fills.forEach((e) => { if (e.getAttribute('clip-path') === 'url(#brv-' + box.dataset.id + ')') e.removeAttribute('clip-path'); });
+      S.lines.forEach((e) => { e.style.strokeDashoffset = '0'; });
+    };
     function frame(now) {
       raf = 0;
       if (t0 === null) t0 = now;
       const t = (now - t0) / 1000;
+      if (still !== null) { reveal(); render(S, pose(still)); return; }
       if (t < REV[1] + .05) {
         S.lines.forEach((e, i) => { const k = Math.min(1, Math.max(0, (t - DRAW[0] - (i % 12) * .03) / (DRAW[1] - DRAW[0] - .3))); e.style.strokeDashoffset = (1 - ease(k)).toFixed(3); });
         const r = ease(Math.min(1, Math.max(0, (t - REV[0]) / (REV[1] - REV[0])))), h = r * (VB.h + 40);
         S.crect.setAttribute('y', f1(CY - h / 2)); S.crect.setAttribute('height', f1(h));
       } else {
-        if (!S.done) { S.done = true; S.fills.forEach((e) => { if (e.getAttribute('clip-path') === 'url(#brv-' + box.dataset.id + ')') e.removeAttribute('clip-path'); }); S.lines.forEach((e) => { e.style.strokeDashoffset = '0'; }); }
+        reveal();
         loop += Math.min(.1, (now - last) / 1000);
         render(S, pose(loop));
       }
@@ -1155,6 +1253,8 @@ SVG_JS = r"""
       if (on) raf = requestAnimationFrame(frame);
     }
     const start = () => { if (!raf && on) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+    // зупинити на моменті циклу (для порівняння з кадрами рендера): box.brgPose(4.5)
+    box.brgPose = (t) => { still = t; on = true; start(); };
     const io = new IntersectionObserver((es) => es.forEach((e) => { on = e.isIntersecting; if (on && sec.classList.contains('in')) start(); }), { rootMargin: '200px 0px' });
     io.observe(box);
     new MutationObserver(() => { if (sec.classList.contains('in')) start(); }).observe(sec, { attributes: true, attributeFilter: ['class'] });
@@ -1167,7 +1267,7 @@ SVG_JS = r"""
 
 def build(mode):
     page = src
-    title = 'прототип v2 · SVG' if mode == 'svg' else 'прототип v2'
+    title = 'прототип v2' if mode == 'svg' else 'прототип v2 · відео'
     page = sub1(r'<title>.*?</title>', f'<title>Meridian Parts · каталог запчастин · {title}</title>', page, 1)
     dsk, mob = page.index('<div class="dsk">'), page.index('<div class="mob">')
     head, d, m = page[:dsk], page[dsk:mob], page[mob:]
@@ -1184,13 +1284,13 @@ def build(mode):
     n_order = page.count('<span class="m">Замовити</span>')
     assert n_order >= 16, n_order
     page = page.replace('<span class="m">Замовити</span>', '<span class="m">' + roll('Замовити') + '</span>')
-    link = ('<a class="vlk" href="./">версія з відео →</a>' if mode == 'svg'
-            else '<a class="vlk" href="v1.html">перша версія прототипу →</a> · <a class="vlk" href="svg.html">версія з SVG →</a>')
+    link = ('<a class="vlk" href="v1.html">перша версія прототипу →</a> · <a class="vlk" href="video.html">версія з відео →</a>' if mode == 'svg'
+            else '<a class="vlk" href="./">головна →</a>')
     page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · ' + link, page, 2)
     return page
 
 
-for mode, name in (('video', 'index.html'), ('svg', 'svg.html')):
+for mode, name in (('svg', 'index.html'), ('video', 'video.html')):
     out = build(mode)
     (ROOT / name).write_text(out, encoding='utf-8')
     print(name, len(out))
