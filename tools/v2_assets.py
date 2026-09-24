@@ -1,4 +1,4 @@
-"""Ресурси для v2.html: кольоровий грейд і креслення фото брендів, креслення й рендери деталей, відео підшипника з альфою.
+"""Ресурси для v2.html: кольоровий грейд фото брендів, креслення й рендери деталей, відео підшипника з альфою.
 
 python tools/v2_assets.py            # усе
 python tools/v2_assets.py brands     # лише фото брендів
@@ -7,7 +7,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import cv2
 import numpy as np
 from PIL import Image
 
@@ -16,8 +15,6 @@ SRC3D = Path('C:/Users/Yalad/meridian-3d')
 OUT = ROOT / 'assets' / 'v2'
 OUT.mkdir(parents=True, exist_ok=True)
 
-INK = np.array([0x26, 0x28, 0x26]) / 255
-PAPER = np.array([0xF1, 0xF0, 0xEB]) / 255
 BRANDS = ['jd', 'claas', 'bednar', 'geringhoff', 'olimac', 'kuhn', 'amazone']
 TILES = ['gear', 'bearing', 'sprocket']
 
@@ -26,38 +23,13 @@ def lum(a):
     return a[..., 0] * .2126 + a[..., 1] * .7152 + a[..., 2] * .0722
 
 
-def grade(a, sat=.62, tone=.35):
-    """Спільний грейд: приглушена насиченість, м'яка S-крива, тонування в діапазон ink→paper."""
+def grade(a):
+    """Спільний грейд «чистий, соковитий»: насиченість ×1,12, м'яка S-крива 25 %, трохи холодніші тіні."""
     L = lum(a)[..., None]
-    a = np.clip(L + (a - L) * sat, 0, 1)
-    a = a * a * (3 - 2 * a) * .35 + a * .65
+    a = np.clip(L + (a - L) * 1.12, 0, 1)
+    a = a * .75 + a * a * (3 - 2 * a) * .25
     L = lum(a)[..., None]
-    duo = INK + (PAPER - INK) * L
-    a = a * (1 - tone) + duo * tone
-    return np.clip(INK + (PAPER - INK) * a, 0, 1)
-
-
-def xdog(a, s=1.0, k=1.6, p=18, eps=.35, phi=14):
-    g = lum(a).astype(np.float32)
-    g1 = cv2.GaussianBlur(g, (0, 0), s)
-    g2 = cv2.GaussianBlur(g, (0, 0), s * k)
-    d = (1 + p) * g1 - p * g2
-    return np.clip(np.where(d >= eps, 1.0, 1 + np.tanh(phi * (d - eps))), 0, 1)
-
-
-def sketch(a, hatch=.24):
-    """Контури Canny по згладженому фото + легке штрихування XDoG. Повертає щільність туші 0..1."""
-    u8 = (a * 255).astype(np.uint8)
-    sm = cv2.edgePreservingFilter(cv2.cvtColor(u8, cv2.COLOR_RGB2BGR), flags=1, sigma_s=40, sigma_r=.25)
-    g = cv2.GaussianBlur(cv2.cvtColor(sm, cv2.COLOR_BGR2GRAY), (0, 0), 1.1)
-    med = float(np.median(g))
-    ed = cv2.Canny(g, .66 * med * .6, min(255, 1.33 * med) * .9, L2gradient=True).astype(np.float32) / 255
-    ed = np.clip(cv2.GaussianBlur(ed, (0, 0), .6) * 1.8, 0, 1)
-    return np.clip(np.maximum(ed, (1 - xdog(a)) * hatch), 0, 1)
-
-
-def on_paper(ink):
-    return PAPER[None, None, :] * (1 - ink[..., None]) + INK[None, None, :] * ink[..., None]
+    return np.clip(a + np.array([-.012, 0, .018]) * (1 - L) ** 2, 0, 1)
 
 
 def save_rgb(a, path, q):
@@ -65,14 +37,12 @@ def save_rgb(a, path, q):
 
 
 def brands():
-    """Слайди героя: повний розмір (до 1600 px) для ПК і 800 px для телефона; до кожного — креслення."""
+    """Слайди героя: до 1600 px для ПК, 800 px для телефона, 320 px — мініатюри в рядку виробників."""
     for n in BRANDS:
         src = Image.open(ROOT / 'assets' / f'bp-{n}.webp').convert('RGB')
-        for suf, w, q in (('', 1600, 80), ('-800', 800, 76)):
+        for suf, w, q in (('', 1600, 80), ('-800', 800, 76), ('-320', 320, 74)):
             im = src if src.width <= w else src.resize((w, round(src.height * w / src.width)), Image.LANCZOS)
-            a = np.asarray(im).astype(np.float32) / 255
-            save_rgb(grade(a), OUT / f'bp-{n}{suf}.webp', q)
-            save_rgb(on_paper(sketch(a)), OUT / f'bp-{n}{suf}-l.webp', 55)
+            save_rgb(grade(np.asarray(im).astype(np.float32) / 255), OUT / f'bp-{n}{suf}.webp', q)
         print('brand', n)
 
 
