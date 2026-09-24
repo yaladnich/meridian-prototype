@@ -5,13 +5,14 @@ python tools/shoot.py URL W H plan.json [тека]
 plan.json — список кроків [js, пауза_с, імʼя]: js виконується на сторінці (null — нічого; «HOVER:селектор» —
 прокрутити до елемента й навести на його центр мишку), потім пауза,
 потім знімок imʼя.jpg (null — без знімка). Значення, яке повертає js, друкується.
-Ширина < 900 вмикає мобільну емуляцію (дотик). Тека за замовчуванням — shots/ у корені репозиторію.
+Ширина < 900 вмикає мобільну емуляцію (дотик). SHOOT_DPR=2 — знімок з подвоєною щільністю пікселів. Тека за замовчуванням — shots/ у корені репозиторію.
 
 Приклад кроку: ["(()=>{const e=document.querySelector('.dsk .brands');scrollTo(0,e.getBoundingClientRect().top+scrollY);return scrollY})()", 2.5, "brands"]
 """
 import asyncio
 import base64
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -55,7 +56,7 @@ async def main(url, w, h, plan, out):
 
             await cmd('Page.enable')
             await cmd('Runtime.enable')
-            await cmd('Emulation.setDeviceMetricsOverride', width=w, height=h, deviceScaleFactor=1, mobile=mobile)
+            await cmd('Emulation.setDeviceMetricsOverride', width=w, height=h, deviceScaleFactor=float(os.environ.get('SHOOT_DPR', '1')), mobile=mobile)
             if mobile:
                 await cmd('Emulation.setTouchEmulationEnabled', enabled=True, maxTouchPoints=5)
             await cmd('Page.navigate', url=url)

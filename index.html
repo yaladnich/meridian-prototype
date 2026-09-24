@@ -1215,6 +1215,23 @@ function phoneDigits(v) {
     for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
     return lo.slice(0, -1).concat(up.slice(0, -1));
   }
+  // перетин опуклих многокутників (Сазерленд — Ходжмен)
+  function clipConvex(subj, clip) {
+    const ar = clip.reduce((a, p, i) => { const q = clip[(i + 1) % clip.length]; return a + p[0] * q[1] - q[0] * p[1]; }, 0), sg = ar > 0 ? 1 : -1;
+    let out = subj;
+    for (let i = 0; i < clip.length && out.length; i++) {
+      const a = clip[i], b = clip[(i + 1) % clip.length], inp = out;
+      const ins = (p) => sg * ((b[0] - a[0]) * (p[1] - a[1]) - (b[1] - a[1]) * (p[0] - a[0])) >= 0;
+      const cut = (p, q) => { const d = (a[0] - b[0]) * (p[1] - q[1]) - (a[1] - b[1]) * (p[0] - q[0]); const t = ((a[0] - p[0]) * (p[1] - q[1]) - (a[1] - p[1]) * (p[0] - q[0])) / d; return [a[0] + t * (b[0] - a[0]), a[1] + t * (b[1] - a[1])]; };
+      out = [];
+      for (let j = 0; j < inp.length; j++) {
+        const p = inp[j], q = inp[(j + 1) % inp.length], pi = ins(p), qi = ins(q);
+        if (pi) { out.push(p); if (!qi) out.push(cut(p, q)); } else if (qi) out.push(cut(p, q));
+      }
+    }
+    return out;
+  }
+  const loop = (r, z) => arc(r, z, 0, 2 * Math.PI, 72).slice(0, -1);
   function el(tag, attrs, parent) {
     const e = document.createElementNS(NS, tag);
     for (const k in attrs) e.setAttribute(k, attrs[k]);
@@ -1243,6 +1260,9 @@ function phoneDigits(v) {
     const crect = el('rect', { x: VB.x - 200, y: CY, width: VB.w + 400, height: 0 }, clip);
     const lines = [], fills = [];
     let gid = 0;
+    // видимість деталей крізь зовнішнє кільце: всередині — лише в отворі, нижче — в отворі й повз корпус
+    const vis = {};
+    for (const k of ['in', 'lo']) { const c = el('clipPath', { id: 'brc' + k + '-' + id }, defs); vis[k] = [el('path', {}, c), el('path', { 'clip-rule': 'evenodd' }, c)]; }
     const fill = (g, d, c, extra) => { const e = el('path', Object.assign({ d, fill: c, stroke: c, 'stroke-width': .6, 'stroke-linejoin': 'round', 'clip-path': 'url(#brv-' + id + ')' }, extra || {}), g); fills.push(e); return e; };
     const line = (g, d, thin) => { const e = el('path', { d, class: 'ln' + (thin ? ' th' : ''), pathLength: 1 }, g); lines.push(e); return e; };
     // смуга тіла обертання з градієнтом тону за кутом
@@ -1331,7 +1351,7 @@ function phoneDigits(v) {
       const chf = fill(g, '', hex(TL)), cap = fill(g, '', hex(TL));
       rolls.push({ g, faces, cap, chf, out: line(g, ''), capl: line(g, '', true), chl: line(g, '') });
     }
-    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, cageSec, flange, bridges, rolls, order: [] };
+    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, cageSec, flange, bridges, rolls, vis, order: [] };
   }
 
   function rollerGeo(phi, k) {
@@ -1397,6 +1417,15 @@ function phoneDigits(v) {
     S.scn.setAttribute('transform', 'translate(0 ' + f1(CY) + ') scale(' + s.toFixed(4) + ') translate(0 ' + f1(-CY) + ')');
     const dy = (dz) => 'translate(0 ' + f1(-dz * CE * K) + ')';
     S.cupB.setAttribute('transform', dy(q.cup)); S.cupF.setAttribute('transform', dy(q.cup)); S.cone.setAttribute('transform', dy(q.cone));
+    const c0 = 3.25 + q.cup, eTop = clipConvex(loop(28.4, 17.35 + q.cup), loop(29.2, 18.25 + q.cup));
+    const outside = 'M-3000 -3000H3000V3000H-3000Z' + poly(hull(loop(36, c0).concat(loop(36, 18.25 + q.cup))), true);
+    S.vis.in[0].setAttribute('d', poly(eTop, true)); S.vis.in[1].setAttribute('d', outside);
+    S.vis.lo[0].setAttribute('d', poly(clipConvex(eTop, loop(33.1, c0)), true)); S.vis.lo[1].setAttribute('d', outside);
+    const vid = S.box.dataset.id;
+    const occl = (g, zhi) => { const u = 'url(#brc' + (zhi <= c0 ? 'lo' : 'in') + '-' + vid + ')'; if (g.getAttribute('clip-path') !== u) g.setAttribute('clip-path', u); };
+    occl(S.cone, 17 + q.cone); occl(S.flange, CG.s[1] + .3);
+    S.cageSec.forEach((x) => occl(x.g, CG.s[1] + .3));
+    S.bridges.forEach((x) => occl(x.g, CG.w0[1]));
     const coneD = depth(0, 0, 17 + q.cone);
     const items = [
       { g: S.cupB, d: depth(0, 32.4, 3.8 + q.cup) },
@@ -1423,6 +1452,7 @@ function phoneDigits(v) {
       r.chl.setAttribute('d', poly(g.rim, true));
       r.capl.setAttribute('d', poly(g.cap, true));
       items.push({ g: r.g, d: depth(g.mid[0], g.mid[1], g.mid[2]) });
+      occl(r.g, g.capC[2] + R1);
     });
     items.sort((a, b) => b.d - a.d);
     if (items.some((it, i) => S.order[i] !== it.g)) { items.forEach((it) => S.scn.appendChild(it.g)); S.order = items.map((it) => it.g); }
