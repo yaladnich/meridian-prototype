@@ -1,8 +1,10 @@
-"""Ресурси для v2.html: кольоровий грейд фото брендів, креслення й рендери деталей, відео підшипника з альфою.
+"""Ресурси для v2.html: кольоровий грейд фото брендів, логотипи виробників, креслення й рендери деталей, відео підшипника з альфою.
 
 python tools/v2_assets.py            # усе
 python tools/v2_assets.py brands     # лише фото брендів
 """
+import io
+import json
 import subprocess
 import sys
 from pathlib import Path
@@ -17,6 +19,8 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 BRANDS = ['jd', 'claas', 'bednar', 'geringhoff', 'olimac', 'kuhn', 'amazone']
 TILES = ['gear', 'bearing', 'sprocket']
+LOGOS_LUM = {'vaderstad', 'bednar'}
+LOGOS = ['claas', 'geringhoff', 'horsch', 'kuhn', 'kverneland', 'amazone', 'parker', 'vaderstad', 'bednar', 'olimac', 'optibelt', 'schumacher']
 
 
 def lum(a):
@@ -44,6 +48,38 @@ def brands():
             im = src if src.width <= w else src.resize((w, round(src.height * w / src.width)), Image.LANCZOS)
             save_rgb(grade(np.asarray(im).astype(np.float32) / 255), OUT / f'bp-{n}{suf}.webp', q)
         print('brand', n)
+
+
+def logos():
+    """Логотипи виробників: одноколірні (#262826, білий фон вибито) і кольорові для наведення; розміри — у logos.json."""
+    import cairosvg
+    meta = {}
+    for k in LOGOS:
+        src = next((ROOT / 'assets' / 'logos' / 'src').glob(f'{k}.*'))
+        if src.suffix == '.svg':
+            im = Image.open(io.BytesIO(cairosvg.svg2png(url=str(src), output_width=1400))).convert('RGBA')
+        else:
+            im = Image.open(src).convert('RGBA')
+        a = np.asarray(im).astype(np.float32) / 255
+        mn = a[..., :3].min(axis=2)
+        white = np.clip((mn - .72) / .21, 0, 1)
+        keep = a[..., 3] * (1 - white * white * (3 - 2 * white))
+        # світлий напис на темній плашці або темний на жовтій: одноколірна версія за яскравістю
+        ink = a[..., 3] * np.clip((.72 - lum(a[..., :3])) / .45, 0, 1) if k in LOGOS_LUM else keep
+        ys, xs = np.where(keep > .04)
+        y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+        ink, keep, rgb = ink[y0:y1, x0:x1], keep[y0:y1, x0:x1], a[y0:y1, x0:x1, :3]
+        h = 120
+        w = round((x1 - x0) * h / (y1 - y0))
+        mono = np.zeros((y1 - y0, x1 - x0, 4), np.float32)
+        mono[..., 0], mono[..., 1], mono[..., 2], mono[..., 3] = .149, .157, .149, ink
+        col = np.dstack([rgb, keep])
+        for arr, suf in ((mono, ''), (col, '-c')):
+            out = Image.fromarray((arr * 255 + .5).astype(np.uint8), 'RGBA').resize((w, h), Image.LANCZOS)
+            out.save(OUT / f'logo-{k}{suf}.webp', 'WEBP', quality=90, alpha_quality=90, method=6)
+        meta[k] = [w, h]
+        print('logo', k, w, h)
+    (OUT / 'logos.json').write_text(json.dumps(meta), encoding='utf-8')
 
 
 def line_alpha(rgba, lo=60, hi=150):
@@ -80,6 +116,6 @@ def video():
 
 
 if __name__ == '__main__':
-    jobs = sys.argv[1:] or ['brands', 'parts', 'video']
+    jobs = sys.argv[1:] or ['brands', 'logos', 'parts', 'video']
     for j in jobs:
         globals()[j]()

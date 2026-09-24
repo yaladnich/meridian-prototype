@@ -2,7 +2,7 @@
 
 Зміни v2: герой — слайди виробників «ч/б → кольорове фото» з виносками й рядком виробників унизу; під героєм каталог;
 «Послуги» з підшипником «креслення → рендер → відео», кроки змінюються за таймером; ізометричні іконки
-в «Умовах роботи», стрічка виробників зі стрілками, координати й приціл у блоці замовлення, зерно паперу.
+в «Умовах роботи», рядок логотипів виробників, координати й приціл у блоці замовлення, зерно паперу.
 
 python tools/build_v2.py
 """
@@ -154,6 +154,35 @@ def plural(n, one, few, many):
 
 def fmt(n):
     return f'{n:,}'.replace(',', '&#160;')
+
+
+# ---------- рядок логотипів виробників ----------
+LOGO_META = json.loads((ROOT / 'assets' / 'v2' / 'logos.json').read_text(encoding='utf-8'))
+LOGO_KEY = {'CLAAS': 'claas', 'Geringhoff': 'geringhoff', 'Horsch': 'horsch', 'Kuhn': 'kuhn', 'Kverneland': 'kverneland',
+            'AMAZONE': 'amazone', 'Parker': 'parker', 'Vaderstad': 'vaderstad', 'Bednar': 'bednar', 'OLIMAC': 'olimac',
+            'Optibelt': 'optibelt', 'Schumacher': 'schumacher'}
+LOGO_NAME = {'Vaderstad': 'Väderstad'}
+
+
+def logo_strip():
+    cells = []
+    for b in sorted(COUNT, key=lambda x: -COUNT[x]):
+        name = html.escape(LOGO_NAME.get(b, b))
+        k = LOGO_KEY.get(b)
+        if k:
+            w, h = LOGO_META[k]
+            ar = w / h
+            hh = min(40, (3600 / ar) ** .5, 170 / ar)
+            cells.append(f'<a href="#" class="lgc" title="{name}"><span class="lgw" style="width: {hh * ar:.0f}px; height: {hh:.0f}px;">'
+                         f'<img class="lm" src="assets/v2/logo-{k}.webp" alt="{name}" loading="lazy" decoding="async">'
+                         f'<img class="lc" src="assets/v2/logo-{k}-c.webp" alt="" aria-hidden="true" loading="lazy" decoding="async"></span></a>')
+        else:
+            cells.append(f'<a href="#" class="lgc"><span class="lgt">{name}</span></a>')
+    return ('<div class="lgs" data-sec=""><span class="sl"></span><div class="bsh"><span class="m">Виробники в&#160;каталозі · '
+            f'{len(COUNT)}</span><span class="bsa"><button type="button" class="slb bsb" data-bs="-1" aria-label="Попередні виробники">{ARROW}</button>'
+            f'<button type="button" class="slb" data-bs="1" aria-label="Наступні виробники">{ARROW}</button></span></div>'
+            f'<div class="bsv"><div class="lgk">{"".join(cells)}</div></div>'
+            '<div class="bsf m g">Оригінальні деталі та&#160;аналоги · логотипи — торгові марки їхніх власників</div></div>')
 
 
 # ---------- герой: слайди виробників ----------
@@ -332,12 +361,7 @@ def part(s, is_mob):
     anchor = '<a href="#" class="morem' if is_mob else '<div class="pager"'
     i = cat.index(anchor)
     cat = cat[:i] + dyn + cat[i:]
-    s = sub1(r'<div class="mq" data-sec="">.*?</div></div>', lambda _: cat + (
-        '<div class="bstr" data-sec=""><span class="sl"></span><div class="bsh"><span class="m">Виробники в&#160;каталозі</span>'
-        '<span class="bsa"><button type="button" class="slb bsb" data-bs="-1" aria-label="Попередні виробники">' + ARROW + '</button>'
-        '<button type="button" class="slb" data-bs="1" aria-label="Наступні виробники">' + ARROW + '</button></span></div>'
-        '<div class="bsv"><div class="bsk"></div></div>'
-        '<div class="bsf m g">Оригінальні деталі та&#160;аналоги · John Deere, Bednar, Geringhoff, CLAAS та&#160;інші</div></div>'), s, 1)
+    s = sub1(r'<div class="mq" data-sec="">.*?</div></div>', lambda _: cat + logo_strip(), s, 1)
     for a, b in (('[03] Типи деталей', '[03] Категорії запчастин'), ('[05] Каталог', '[01] Каталог'),
                  ('[06] Умови роботи', '[05] Умови роботи'), ('[07] Під замовлення', '[06] Під замовлення')):
         s = sub1(re.escape(a), b, s, 1)
@@ -550,22 +574,27 @@ a.vlk:hover{color:var(--ink)}
 .facts.in .iso .hd{opacity:1}
 .facts.in .iso .ia{transform:none}
 .mob .iso{width:150px;margin:-6px 0 0 -8px}
-/* стрічка виробників */
-.bstr{position:relative}
+/* рядок логотипів виробників */
+.bsb .ico{transform:rotate(180deg)}
+.lgs{position:relative}
 .bsh{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px 20px;border-bottom:1px solid var(--line)}
 .bsa{display:flex;gap:6px}
 .bsa .slb{transition:background .25s,color .25s}
 .bsa .slb:hover{background:var(--ink);color:var(--paper)}
-.bsb .ico{transform:rotate(180deg)}
 .bsv{overflow:hidden}
-.bsk{display:flex;transition:transform .8s cubic-bezier(.6,.05,.3,1)}
-.bsc2{flex:0 0 20%;height:104px;display:flex;flex-direction:column;justify-content:center;gap:6px;padding:0 20px;border-right:1px solid var(--line);transition:background .25s}
-.bsc2 b{font-size:26px;font-weight:700;letter-spacing:-.035em;text-transform:uppercase;line-height:1.1;white-space:nowrap}
-.bsc2:hover{background:var(--p2)}
+.lgk{display:flex;transition:transform .8s cubic-bezier(.6,.05,.3,1)}
+.lgc{flex:0 0 calc(100% / 6);height:112px;display:flex;align-items:center;justify-content:center;border-right:1px solid var(--line);transition:background .25s}
+.lgc:hover{background:var(--p2)}
+.lgw{position:relative;display:block}
+.lgw img{position:absolute;inset:0;width:100%;height:100%;transition:opacity .35s}
+.lgw .lc,.lgc:hover .lm{opacity:0}
+.lgc:hover .lc{opacity:1}
+.lgt{font-size:22px;font-weight:700;letter-spacing:-.035em;text-transform:uppercase;line-height:1;white-space:nowrap}
 .bsf{padding:9px 20px;border-top:1px solid var(--line);font-size:11px}
 .mob .bsh{padding:6px 6px 6px 16px}
-.mob .bsc2{flex-basis:50%;height:84px;padding:0 16px}
-.mob .bsc2 b{font-size:19px}
+.mob .lgc{flex-basis:50%;height:88px}
+.mob .lgw{transform:scale(.85)}
+.mob .lgt{font-size:18px}
 .mob .bsf{padding:8px 16px}
 /* блок замовлення: координати й приціл */
 .ord .xy{position:absolute;z-index:2;font-size:10px;letter-spacing:.02em;color:#8E8D86;pointer-events:none}
@@ -804,22 +833,17 @@ JS = r"""
     more.addEventListener('click', page);
   });
 
-  // стрічка виробників: кількість товарів рахується з каталогу
-  const cntB = {};
-  CAT.forEach((p) => { cntB[p.m] = (cntB[p.m] || 0) + 1; });
-  const brands = Object.keys(cntB).sort((a, b) => cntB[b] - cntB[a]);
-  const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
-  document.querySelectorAll('.bstr').forEach((st) => {
-    const trk = st.querySelector('.bsk');
-    trk.innerHTML = brands.map((b) => '<a href="#" class="bsc2"><b>' + esc(b) + '</b><span class="m g">'
-      + fmtN(cntB[b]) + ' ' + plural(cntB[b], 'товар', 'товари', 'товарів') + '</span></a>').join('');
+  // рядок логотипів: стрілки й автопрокрутка, пауза під мишею
+  document.querySelectorAll('.lgs').forEach((st) => {
+    const trk = st.querySelector('.lgk'), n = trk.children.length;
     let i = 0, t = 0, hover = false;
-    const per = () => (matchMedia('(max-width: 899px)').matches ? 2 : 5);
-    const show = () => { const mx = brands.length - per(); if (i > mx) i = 0; if (i < 0) i = mx; trk.style.transform = 'translateX(' + (-i * 100 / per()) + '%)'; };
+    const per = () => (matchMedia('(max-width: 899px)').matches ? 2 : 6);
+    const show = () => { const mx = n - per(); if (i > mx) i = 0; if (i < 0) i = mx; trk.style.transform = 'translateX(' + (-i * 100 / per()) + '%)'; };
     const next = () => { clearTimeout(t); t = setTimeout(() => { if (!hover) { i++; show(); } next(); }, 3200); };
     st.querySelectorAll('[data-bs]').forEach((b) => b.addEventListener('click', () => { i += +b.dataset.bs; show(); next(); }));
     st.addEventListener('pointerenter', (e) => { if (e.pointerType === 'mouse') hover = true; });
     st.addEventListener('pointerleave', () => { hover = false; });
+    window.addEventListener('resize', show);
     show(); next();
   });
 
@@ -851,6 +875,11 @@ JS = r"""
 JS = JS.replace('PHOTO_IDS_JSON', json.dumps(PHOTO_IDS))
 page = sub1(r'</style>', lambda _: CSS + '</style>', page, 1)
 page = sub1(r'</script>\s*</body>', lambda _: '</script>' + JS + '</body>', page, 1)
+page = sub1(r'\. Wikimedia Commons, CC BY-SA 3\.0 / 4\.0</div>', lambda _: (
+    '. Wikimedia Commons, CC BY-SA 3.0 / 4.0. Логотипи BEDNAR і OLIMAC: '
+    '<a href="https://commons.wikimedia.org/wiki/File:BEDNAR_logo_2019_RGB.jpg" target="_blank" rel="noopener">Cz-bd-1</a>, '
+    '<a href="https://commons.wikimedia.org/wiki/File:OLIMAC_LOGO.png" target="_blank" rel="noopener">Agromacintosh</a>, '
+    'Wikimedia Commons, CC BY-SA 4.0. Логотипи виробників — торгові марки їхніх власників.</div>'), page, 2)
 page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · <a class="vlk" href="index.html">прототип v2, перша версія →</a>', page, 2)
 
 (ROOT / 'v2.html').write_text(page, encoding='utf-8')
