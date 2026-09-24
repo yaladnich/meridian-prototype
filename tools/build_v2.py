@@ -158,7 +158,7 @@ def fmt(n):
 # ---------- герой: слайди виробників ----------
 # виноски: (x %, y %, напис, плашка ліворуч) у координатах фото 3:2; mt — одна виноска для телефона
 SLIDES = [
-    dict(k='jd', b='John Deere', t=[(36, 74, 'Пальці протирізучі · 7', False), (51, 49, 'Датчики · 15', True), (70, 58, 'Ремені · 14', False)],
+    dict(k='jd', b='John Deere', t=[(42, 74, 'Пальці протирізучі · 7', False), (51, 49, 'Датчики · 15', True), (70, 58, 'Ремені · 14', False)],
          mt=(70, 58, 'Ремені · 14', True)),
     dict(k='claas', b='CLAAS', t=[(47, 58, 'Підшипники · 10', False), (30, 38, 'Ущільнення · 7', True), (62, 70, 'Кільця · 9', False)],
          mt=(44, 60, 'Підшипники · 10', False)),
@@ -166,7 +166,7 @@ SLIDES = [
          mt=(46, 66, 'Долота · 5', False)),
     dict(k='geringhoff', b='Geringhoff', t=[(86, 64, 'Зірочки · 4', True), (74, 74, 'Ножі · 4', True)],
          mt=(70, 66, 'Зірочки · 4', True)),
-    dict(k='olimac', b='OLIMAC', t=[(33, 67, 'Носки вальців · 2', False), (46, 56, 'Підшипники · 5', False)],
+    dict(k='olimac', b='OLIMAC', t=[(39, 69, 'Носки вальців · 2', False), (46, 56, 'Підшипники · 5', False)],
          mt=(38, 58, 'Підшипники · 5', False)),
     dict(k='kuhn', b='Kuhn', t=[(40, 44, 'Запчастини Kuhn · 15', False)],
          mt=(40, 44, 'Запчастини Kuhn · 15', False)),
@@ -180,7 +180,7 @@ RULERS = '<span class="ru h t"></span><span class="ru h b"></span><span class="r
 
 def hero(mob, boot, intro_t):
     n, suf = len(SLIDES), '-800' if mob else ''
-    slides, caps, cells = [], [], []
+    slides, plates, cells = [], [], []
     for i, s in enumerate(SLIDES):
         k, alt, first = s['k'], ALT[s['k']], i == 0
         on = ' on' if first else ''
@@ -195,8 +195,11 @@ def hero(mob, boot, intro_t):
                       f'<div class="hc"><div class="hb"><img class="bc" {attr} alt="{alt}" decoding="async"></div></div>'
                       f'<div class="ht"><div class="hb">{tags}</div></div>'
                       f'<span class="bpl"></span><span class="bnd u"></span><span class="bnd d"></span><span class="bpn m"></span></div>')
-        caps.append(f'<span class="hcp m{on}">{alt}</span>')
         c = COUNT[s['b']]
+        plates.append(f'<div class="hp{on}"><div class="hph m"><span>Виробник</span><span>[{i + 1:02d}]</span></div>'
+                      f'<div class="hpb"><b>{s["b"]}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")} у&#160;каталозі</span>'
+                      f'<span class="hpc m g">{alt}</span></div>'
+                      f'<a href="#" class="hpl hv"><span class="tbg" aria-hidden="true"></span><span class="m">{roll("Запчастини " + s["b"])}</span>{ARROW}</a></div>')
         cells.append(f'<button type="button" class="hbc{on}"><i class="hbp"></i>'
                      f'<span class="hbt"><img src="assets/v2/bp-{k}-320.webp" alt="" loading="lazy" decoding="async"></span>'
                      f'<span class="hbn"><b>{s["b"]}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")}</span></span></button>')
@@ -211,7 +214,7 @@ def hero(mob, boot, intro_t):
                 f'<button type="button" class="slb bsb" data-hs="-1" aria-label="Попередній виробник">{ARROW}</button>'
                 f'<button type="button" class="slb" data-hs="1" aria-label="Наступний виробник">{ARROW}</button></div>')
     return (f'<section class="hero v3h" aria-label="Виробники"><div class="hvw"><div class="hsl">{"".join(slides)}</div>{RULERS}{CROSSES}'
-            f'{boot}{intro_t}{labs}<div class="hcps">{"".join(caps)}</div>{controls}</div>'
+            f'{boot}{intro_t}{labs}<div class="hps">{"".join(plates)}</div>{controls}</div>'
             f'<div class="hstr">{"".join(cells)}</div></section>')
 
 
@@ -351,9 +354,16 @@ a.vlk:hover{color:var(--ink)}
 .hs.on .tg{animation:wipe .7s cubic-bezier(.6,.05,.3,1) forwards;animation-delay:calc(var(--d) + var(--t0) + var(--tw) + .9s)}
 .v3h .lab .m{padding:2px 6px;background:var(--paper)}
 .v3h .boot{animation:fadeOut .6s 2.9s forwards}
-.hcps{position:absolute;left:28px;bottom:22px;z-index:5;display:grid;animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) 3.6s backwards}
-.hcp{grid-area:1/1;justify-self:start;padding:3px 6px;background:var(--paper);font-size:10.5px;opacity:0;transition:opacity .3s}
-.hcp.on{opacity:1;transition:opacity .4s 1s}
+.hps{position:absolute;left:28px;bottom:24px;z-index:5;display:grid;width:340px;animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) 3.6s backwards}
+.hp{grid-area:1/1;align-self:end;background:var(--paper);border:1px solid var(--ink);opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .3s,transform .45s cubic-bezier(.2,.7,.2,1),visibility 0s .45s}
+.hp.on{opacity:1;visibility:visible;transform:none;transition:opacity .35s .2s,transform .5s cubic-bezier(.2,.7,.2,1) .2s}
+.hph{display:flex;justify-content:space-between;padding:7px 12px;background:var(--ink);color:var(--paper)}
+.hpb{display:flex;flex-direction:column;gap:5px;padding:12px 12px 12px}
+.hpb b{font-size:38px;line-height:1;font-weight:700;letter-spacing:-.045em;text-transform:uppercase;padding-bottom:.08em}
+.hpc{font-size:10.5px}
+.hpl{display:flex;align-items:center;justify-content:space-between;height:42px;padding:0 12px;border-top:1px solid var(--ink)}
+.hpl .ico{transition:transform .3s}.hpl:hover .ico{transform:translateX(4px)}
+@media (max-width:1240px){.hps{width:300px}.hpb b{font-size:30px}}
 .hct{position:absolute;right:28px;bottom:18px;z-index:5;display:flex;align-items:center;gap:6px;animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) 3.7s backwards}
 .hnum{margin-right:4px;padding:3px 6px;background:var(--paper)}
 .hct .slb{transition:background .25s,color .25s}.hct .slb:hover{background:var(--ink);color:var(--paper)}
@@ -372,7 +382,11 @@ a.vlk:hover{color:var(--ink)}
 .hbc.on .hbp.run{animation:hsG var(--sd,7000ms) linear forwards}
 .v3h.ps .hbp{animation-play-state:paused}
 .mob .hs .bpn{left:14px}
-.mob .hcps{left:10px;bottom:10px}
+.mob .hps{left:8px;right:8px;bottom:8px;width:auto}
+.mob .hph,.mob .hpc{display:none}
+.mob .hpb{padding:10px 12px}
+.mob .hpb b{font-size:28px}
+.mob .hpl{height:40px}
 .mob .hct{right:8px;bottom:auto;top:8px}
 .mob .hct .slb{width:40px;height:40px}
 .mob .hstr{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;scrollbar-width:none}
@@ -499,7 +513,7 @@ JS = r"""
   const initHero = (h) => {
     if (h.dataset.ok || !vis(h)) return;
     h.dataset.ok = '1';
-    const sl = Array.from(h.querySelectorAll('.hs')), cps = Array.from(h.querySelectorAll('.hcp'));
+    const sl = Array.from(h.querySelectorAll('.hs')), pl = Array.from(h.querySelectorAll('.hp'));
     const cells = Array.from(h.querySelectorAll('.hbc')), bars = cells.map((c) => c.querySelector('.hbp'));
     const num = h.querySelector('.hnum'), strip = h.querySelector('.hstr'), n = sl.length;
     const pad = (x) => (x < 10 ? '0' : '') + x;
@@ -531,7 +545,7 @@ JS = r"""
       const s = sl[i];
       s.style.setProperty('--t0', '0s'); s.style.setProperty('--tw', '.9s');
       s.classList.remove('on'); void s.offsetWidth; s.classList.add('on');
-      [cps, cells].forEach((l) => l.forEach((e, j) => e.classList.toggle('on', j === i)));
+      [pl, cells].forEach((l) => l.forEach((e, j) => e.classList.toggle('on', j === i)));
       num.textContent = pad(i + 1) + ' / ' + pad(n);
       if (strip.scrollWidth > strip.clientWidth + 1) strip.scrollTo({ left: cells[i].offsetLeft - 8, behavior: 'smooth' });
       load(i + 1); load(i - 1);
