@@ -135,4 +135,4 @@ python tools/build_v2.py           # index.html → v2.html
 |---|---|---|
 | до 23.09.2026 | v1: прототип каталогу, пошук, слайдер категорій, умови роботи | `6fb0251`…`5fa5639` |
 | 23.09.2026 | Клон у `C:\Users\Yalad\meridian-prototype`; v2 за референсом Heron (герой, бренди, «Послуги», іконки, стрічка, координати, зерно) | `66442bb` |
-| 24.09.2026 | `BRIEF.md`, `CLAUDE.md`, `tools/shoot.py`, `.gitignore` | цей |
+| 24.09.2026 | `BRIEF.md`, `CLAUDE.md`, `tools/shoot.py`, `.gitignore` | `68ea15d` |
