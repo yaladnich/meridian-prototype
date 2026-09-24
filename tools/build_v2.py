@@ -427,6 +427,8 @@ a.vlk:hover{color:var(--ink)}
 .v3h{--hh:clamp(460px,40vw,580px);height:auto;overflow:visible;background-image:none}
 .mob .v3h{--hh:400px;height:auto}
 .dsk .intro{grid-template-columns:minmax(0,4fr) minmax(0,2fr) minmax(0,1fr)}
+.dsk .stmt .body{padding-bottom:14px}
+.dsk .stmt .btn-o{height:40px}
 .hvw{position:relative;height:var(--hh);overflow:hidden}
 .hsl{position:absolute;inset:0;overflow:hidden;z-index:0}
 .hs{position:absolute;inset:0;visibility:hidden;--t0:0s;--tw:.9s}
