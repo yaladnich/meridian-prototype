@@ -293,7 +293,7 @@ def bearing(mob, base):
         marks = tag(60, 24, 'Підшипники · 85', base, left=True)
     else:
         marks = (tag(25, 66, 'Підшипники · 85', base, left=True)
-                 + an(29.5, 42, ['Ролики циліндричні × 16', 'поз. 01'], base + .2, left=True)
+                 + an(29.5, 42, ['Ролики конічні × 16', 'поз. 01'], base + .2, left=True)
                  + an(64, 24.5, ['Кільце зовнішнє', 'поз. 02'], base + .35)
                  + an(66.5, 44, ['Кільце внутрішнє', 'поз. 03'], base + .5))
     return ('<div class="lay l" aria-hidden="true"><div class="stage"><img class="b3" src="assets/v2/bearing-l.webp" alt="" '
@@ -305,7 +305,22 @@ def bearing(mob, base):
             f'{marks}</div></div><span class="bnd2 u"></span><span class="bnd2 d"></span><span class="spl2"></span><span class="spn m"></span>')
 
 
-def services(mob):
+def bearing_svg(mob):
+    """Підшипник, який малює й анімує скрипт SVG_JS; виноски .ca прив'язані до деталей."""
+    i = 'm' if mob else 'd'
+    if mob:
+        marks = f'<span class="ca" data-a="cupT">{tag(0, 0, "Підшипники · 85", 3.0, left=True)}</span>'
+    else:
+        marks = (f'<span class="ca" data-a="cupF">{tag(0, 0, "Підшипники · 85", 3.0)}</span>'
+                 f'<span class="ca" data-a="roll">{an(0, 0, ["Ролики конічні × 16", "поз. 01"], 3.2, left=True)}</span>'
+                 f'<span class="ca" data-a="cupT">{an(0, 0, ["Кільце зовнішнє", "поз. 02"], 3.35)}</span>'
+                 f'<span class="ca" data-a="cone">{an(0, 0, ["Кільце внутрішнє", "поз. 03"], 3.5, left=True)}</span>')
+    return (f'<div class="svis2 sgb" data-id="{i}"><svg class="brg" viewBox="-480 -425 960 660" aria-label="Конічний роликовий підшипник" role="img">'
+            f'<defs></defs><g class="brs"></g></svg>{marks}'
+            '<span class="bnd2 u"></span><span class="bnd2 d"></span><span class="spl2"></span><span class="spn m"></span></div>')
+
+
+def services(mob, mode='video'):
     n = len(STEPS)
     hs, hdr, txt, prg = [], [], [], []
     for i, s in enumerate(STEPS):
@@ -319,7 +334,7 @@ def services(mob):
             f'<span class="scl h"></span><span class="scl v"></span>'
             f'<div class="slab m"><span>[04] Послуги</span><span class="g">Працюємо з людьми та для людей</span></div>'
             f'<div class="scnt m">01 / 0{n}</div>'
-            f'<div class="shd">{"".join(hs)}</div><div class="svis2 v2h">{bearing(mob, 3.0)}</div>'
+            f'<div class="shd">{"".join(hs)}</div>{bearing_svg(mob) if mode == "svg" else f'<div class="svis2 v2h">{bearing(mob, 3.0)}</div>'}'
             f'<div class="scd"><div class="sch m">{"".join(hdr)}</div><div class="scb">{"".join(txt)}</div>'
             f'<div class="scf"><i></i></div></div>'
             f'<div class="spg">{"".join(prg)}</div></div></section>')
@@ -356,14 +371,7 @@ def reroll(s, old, new, count):
     return ''.join(out) + s[pos:]
 
 
-page = src
-page = sub1(r'<title>.*?</title>', '<title>Meridian Parts · каталог запчастин · прототип v2</title>', page, 1)
-
-dsk, mob = page.index('<div class="dsk">'), page.index('<div class="mob">')
-head, d, m = page[:dsk], page[dsk:mob], page[mob:]
-
-
-def part(s, is_mob):
+def part(s, is_mob, mode='video'):
     old = re.search(r'<section class="hero">.*?</section>', s, re.S).group(0)
     boot = re.search(r'<div class="boot">.*?</div>', old, re.S).group(0)
     intro_t = re.search(r'<div class="intro-t">.*?</div>', old, re.S).group(0)
@@ -396,7 +404,7 @@ def part(s, is_mob):
         s = sub1(re.escape(a), b, s, 1)
     if not is_mob:
         s = reroll(s, 'Усі типи', 'Усі категорії', 1)
-    s = sub1(r'(?=<section class="facts")', lambda _: services(is_mob), s, 1)
+    s = sub1(r'(?=<section class="facts")', lambda _: services(is_mob, mode), s, 1)
     it = iter(ICONS)
     s = sub1(r'<div class="fb">', lambda _: '<div class="fb">' + next(it), s, 4)
     s = sub1(r'(<section class="ord rv-ln"[^>]*>)', lambda mm: mm[1] + (
@@ -406,7 +414,6 @@ def part(s, is_mob):
     return s
 
 
-page = head + part(d, False) + part(m, True)
 
 GRAIN = ("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E"
          "%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E"
@@ -932,18 +939,258 @@ JS = r"""
 </script>
 """
 
-JS = JS.replace('PHOTO_IDS_JSON', json.dumps(PHOTO_IDS))
-page = sub1(r'</style>', lambda _: CSS + '</style>', page, 1)
-page = sub1(r'</script>\s*</body>', lambda _: '</script>' + JS + '</body>', page, 1)
-page = sub1(r'\. Wikimedia Commons, CC BY-SA 3\.0 / 4\.0</div>', lambda _: (
-    '. Wikimedia Commons, CC BY-SA 3.0 / 4.0. Логотипи BEDNAR і OLIMAC: '
-    '<a href="https://commons.wikimedia.org/wiki/File:BEDNAR_logo_2019_RGB.jpg" target="_blank" rel="noopener">Cz-bd-1</a>, '
-    '<a href="https://commons.wikimedia.org/wiki/File:OLIMAC_LOGO.png" target="_blank" rel="noopener">Agromacintosh</a>, '
-    'Wikimedia Commons, CC BY-SA 4.0. Логотипи виробників — торгові марки їхніх власників.</div>'), page, 2)
-n_order = page.count('<span class="m">Замовити</span>')
-assert n_order >= 16, n_order
-page = page.replace('<span class="m">Замовити</span>', '<span class="m">' + roll('Замовити') + '</span>')
-page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · <a class="vlk" href="v1.html">перша версія прототипу →</a>', page, 2)
 
-(ROOT / 'index.html').write_text(page, encoding='utf-8')
-print('index.html', len(page))
+SVG_CSS = r"""
+/* підшипник у SVG */
+.sgb{aspect-ratio:960/660}
+.sgb>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.sgb .ln{fill:none;stroke:#262826;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1}
+.sgb .ln.th{stroke-width:.9}
+.sgb .ca{position:absolute;inset:0;pointer-events:none;z-index:4}
+.sgb .ca .tg{pointer-events:auto}
+.sgb .ca .tg,.sgb .ca .an{width:max-content}
+.mob .sgb{width:120%;top:48%}
+"""
+
+SVG_JS = r"""
+<script>
+(function () {
+  // підшипник у SVG: конічний роликопідшипник 35×72×18,25 (геометрія з моделі Blender), орто-камера 30°, три тони + контур
+  const NS = 'http://www.w3.org/2000/svg';
+  const DEG = Math.PI / 180, CE = Math.cos(30 * DEG), SE = Math.sin(30 * DEG), K = 10;
+  const T1 = '#ECEBE6', T2 = '#CFCEC8', T3 = '#9C9B96', PAPER = '#F1F0EB';
+  const LA = 195 * DEG, AS = LA + 90 * DEG;
+  const L3 = (() => { const v = [Math.cos(LA), Math.sin(LA), .55], n = Math.hypot(v[0], v[1], v[2]); return v.map((x) => x / n); })();
+  const VB = { x: -480, y: -425, w: 960, h: 660 }, CY = VB.y + VB.h / 2, ZOOM = 1.35;
+  const P = (x, y, z) => [x * K, -(z * CE + y * SE) * K];
+  const f1 = (v) => (Math.round(v * 10) / 10).toString();
+  const poly = (pts, close) => 'M' + pts.map((p) => f1(p[0]) + ' ' + f1(p[1])).join('L') + (close ? 'Z' : '');
+  const arc = (r, z, a0, a1, n = 56) => { const o = []; for (let i = 0; i <= n; i++) { const a = a0 + (a1 - a0) * i / n; o.push(P(r * Math.cos(a), r * Math.sin(a), z)); } return o; };
+  const ring = (r, z) => poly(arc(r, z, 0, 2 * Math.PI, 96), true);
+  const ease = (x) => x * x * (3 - 2 * x);
+  const seg = (t, a, b) => ease(Math.min(1, Math.max(0, (t - a) / (b - a))));
+  const depth = (x, y, z) => y * CE - z * SE;
+
+  // геометрія, мм (див. meridian-3d/scripts/meridian.py → build_bearing)
+  const zA = 114.7, TH = 14 * DEG, Lm = 108.7, tanT = 4.3 / Lm, L1 = Lm - 6.75, L2 = Lm + 6.75, R1 = L1 * tanT, R2 = L2 * tanT;
+  const CUP = { ro: 36, ri: 29.2, rc: 35, z0: 3.25, z1: 18.25, rw: 32.4, zw: 3.8 };
+
+  function hull(pts) {
+    const p = pts.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const cr = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const q of p) { while (lo.length > 1 && cr(lo[lo.length - 2], lo[lo.length - 1], q) <= 0) lo.pop(); lo.push(q); }
+    for (let i = p.length - 1; i >= 0; i--) { const q = p[i]; while (up.length > 1 && cr(up[up.length - 2], up[up.length - 1], q) <= 0) up.pop(); up.push(q); }
+    return lo.slice(0, -1).concat(up.slice(0, -1));
+  }
+  // бокова стінка тіла обертання між (r0,z0) і (r1,z1): передня половина, освітлена й тіньова частини
+  function wall(r0, z0, r1, z1) {
+    const band = (a, b) => poly(arc(r0, z0, a, b, 40).concat(arc(r1, z1, b, a, 40)), true);
+    return [[band(Math.PI, AS), T2], [band(AS, 2 * Math.PI), T3]];
+  }
+  function el(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+
+  function build(box) {
+    const id = box.dataset.id, svg = box.querySelector('svg'), scn = svg.querySelector('.brs'), defs = svg.querySelector('defs');
+    const clip = el('clipPath', { id: 'brv-' + id }, defs);
+    const crect = el('rect', { x: VB.x - 200, y: CY, width: VB.w + 400, height: 0 }, clip);
+    const lines = [], fills = [];
+    const fill = (g, d, c, extra) => { const e = el('path', Object.assign({ d, fill: c, 'clip-path': 'url(#brv-' + id + ')', class: 'fl' }, extra || {}), g); fills.push(e); return e; };
+    const line = (g, d, thin) => { const e = el('path', { d, class: 'ln' + (thin ? ' th' : ''), pathLength: 1 }, g); lines.push(e); return e; };
+
+    // кільце зовнішнє: задня частина (доріжка, видна крізь отвір) і передня (верхній торець + зовнішня стінка)
+    const cupB = el('g', {}, scn), cupF = el('g', {}, scn);
+    const opening = (g, r, z) => {
+      fill(g, poly(arc(r, z, 105 * DEG, 285 * DEG, 48), true), T3);
+      fill(g, poly(arc(r, z, 285 * DEG, 465 * DEG, 48), true), T2);
+    };
+    // доріжка видна лише між верхнім краєм і нижнім отвором; крізь нижній отвір видно деталі під кільцем
+    const wclip = el('clipPath', { id: 'brw-' + id }, defs);
+    el('path', { d: 'M-3000 -3000H3000V3000H-3000Z' + ring(CUP.rw, CUP.zw), 'clip-rule': 'evenodd' }, wclip);
+    const tclip = el('clipPath', { id: 'brt-' + id }, defs);
+    el('path', { d: ring(CUP.ri, CUP.z1) }, tclip);
+    opening(el('g', { 'clip-path': 'url(#brw-' + id + ')' }, cupB), CUP.ri, CUP.z1);
+    line(cupB, poly(arc(CUP.rw, CUP.zw, 0, Math.PI)), true).setAttribute('clip-path', 'url(#brt-' + id + ')');
+    for (const [d, c] of wall(CUP.ro, CUP.z1, CUP.ro, CUP.z0)) fill(cupF, d, c);
+    fill(cupF, ring(CUP.ro, CUP.z1) + ring(CUP.ri, CUP.z1), T1, { 'fill-rule': 'evenodd' });
+    line(cupF, ring(CUP.ro, CUP.z1)); line(cupF, ring(CUP.ri, CUP.z1)); line(cupF, ring(CUP.rc, CUP.z1), true);
+    line(cupF, poly(arc(CUP.ro, CUP.z0, Math.PI, 2 * Math.PI)));
+    line(cupF, poly([P(-CUP.ro, 0, CUP.z0), P(-CUP.ro, 0, CUP.z1)])); line(cupF, poly([P(CUP.ro, 0, CUP.z0), P(CUP.ro, 0, CUP.z1)]));
+    line(cupB, poly(arc(CUP.ri, CUP.z1 - 1.5, 20 * DEG, 160 * DEG)), true);
+
+    // кільце внутрішнє (конус): бурт, доріжка, верхній торець, отвір
+    const cone = el('g', {}, scn);
+    const bclip = el('clipPath', { id: 'brb-' + id }, defs);
+    el('path', { d: ring(17.5, 17) }, bclip);
+    fill(cone, ring(25.92, 2.18) + ring(23.5, 2.18), T1, { 'fill-rule': 'evenodd' });
+    for (const [d, c] of wall(26, 2.18, 26, .6).concat(wall(23.5, 1.58, 20.67, 15.17), wall(21.95, 15.45, 21.95, 17))) fill(cone, d, c);
+    fill(cone, ring(21.95, 17) + ring(17.5, 17), T1, { 'fill-rule': 'evenodd' });
+    opening(cone, 17.5, 17);
+    const gh = el('g', { 'clip-path': 'url(#brv-' + id + ')' }, cone);
+    fills.push(gh);
+    el('path', { d: ring(17.5, 0), fill: PAPER, 'clip-path': 'url(#brb-' + id + ')' }, gh);
+    line(cone, ring(21.95, 17)); line(cone, ring(17.5, 17)); line(cone, ring(21.45, 17), true);
+    line(cone, poly(arc(26, .6, Math.PI, 2 * Math.PI))); line(cone, poly(arc(25.92, 2.18, 0, 2 * Math.PI, 96)), true);
+    line(cone, poly(arc(23.5, 1.58, Math.PI, 2 * Math.PI)), true);
+    for (const s of [-1, 1]) {
+      line(cone, poly([P(s * 26, 0, .6), P(s * 26, 0, 2.18)]));
+      line(cone, poly([P(s * 23.5, 0, 1.58), P(s * 20.67, 0, 15.17), P(s * 21.95, 0, 15.45), P(s * 21.95, 0, 17)]));
+    }
+    line(cone, poly(arc(17.5, 0, 25 * DEG, 155 * DEG)), true);
+
+    // ролики: конічні, вісь нахилена на 14° до осі підшипника
+    const rolls = [];
+    for (let i = 0; i < 16; i++) {
+      const g = el('g', {}, scn);
+      rolls.push({ g, side: fill(g, '', T2), shade: fill(g, '', T3), cap: fill(g, '', T1), out: line(g, ''), capl: line(g, '') });
+    }
+    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, rolls, order: [] };
+  }
+
+  function rollerGeo(phi, k) {
+    const er = [Math.cos(phi), Math.sin(phi), 0];
+    const uw = [Math.sin(TH) * er[0], Math.sin(TH) * er[1], -Math.cos(TH)];
+    const e1n = Math.hypot(uw[1], uw[0]);
+    const e1 = [uw[1] / e1n, -uw[0] / e1n, 0];
+    const e2 = [uw[1] * e1[2] - uw[2] * e1[1], uw[2] * e1[0] - uw[0] * e1[2], uw[0] * e1[1] - uw[1] * e1[0]];
+    const od = [Math.cos(TH) * er[0] * k, Math.cos(TH) * er[1] * k, Math.sin(TH) * k];
+    const circ = (L, rho) => {
+      const c = [L * uw[0] + od[0], L * uw[1] + od[1], zA + L * uw[2] + od[2]], pts = [], sh = [];
+      for (let j = 0; j < 28; j++) {
+        const t = 2 * Math.PI * j / 28, ct = Math.cos(t), st = Math.sin(t);
+        const n = [ct * e1[0] + st * e2[0], ct * e1[1] + st * e2[1], ct * e1[2] + st * e2[2]];
+        const p = P(c[0] + rho * n[0], c[1] + rho * n[1], c[2] + rho * n[2]);
+        pts.push(p);
+        if (n[0] * L3[0] + n[1] * L3[1] + n[2] * L3[2] < 0) sh.push(p);
+      }
+      return { c, pts, sh };
+    };
+    const a = circ(L1, R1), b = circ(L2, R2);
+    const mid = [(a.c[0] + b.c[0]) / 2, (a.c[1] + b.c[1]) / 2, (a.c[2] + b.c[2]) / 2];
+    return { out: hull(a.pts.concat(b.pts)), shade: hull(a.sh.concat(b.sh)), cap: a.pts, capC: a.c, mid };
+  }
+
+  // пози за часом (с від кінця проявлення), цикл 8 с — як у рендері Blender
+  const e13 = ease(1 / 3);
+  function spin(t) {
+    if (t < 2) return 22.5 * (ease((t + 1) / 3) - e13);
+    if (t < 7) return 22.5 * (1 - e13);
+    return 22.5 * (1 - e13) + 22.5 * ease((t - 7) / 3);
+  }
+  function pose(t) {
+    t = ((t % 8) + 8) % 8;
+    return {
+      spin: spin(t) * DEG,
+      cup: 20 * (seg(t, 2.0, 3.1) - seg(t, 5.9, 7.0)),
+      cone: -20 * (seg(t, 2.8, 4.0) - seg(t, 5.0, 6.2)),
+      roll: 2.5 * (seg(t, 2.2, 3.2) - seg(t, 5.8, 6.8)),
+      zoom: seg(t, 1.8, 3.0) - seg(t, 5.9, 7.1),
+    };
+  }
+
+  function render(S, q) {
+    const s = 1 / (1 + (ZOOM - 1) * q.zoom);
+    S.scn.setAttribute('transform', 'translate(0 ' + f1(CY) + ') scale(' + s.toFixed(4) + ') translate(0 ' + f1(-CY) + ')');
+    const dy = (dz) => 'translate(0 ' + f1(-dz * CE * K) + ')';
+    S.cupB.setAttribute('transform', dy(q.cup)); S.cupF.setAttribute('transform', dy(q.cup)); S.cone.setAttribute('transform', dy(q.cone));
+    const items = [
+      { g: S.cupB, d: depth(0, CUP.rw, CUP.zw + q.cup) },
+      { g: S.cupF, d: depth(0, -CUP.ro, 10.75 + q.cup) },
+      { g: S.cone, d: depth(0, 0, 17 + q.cone) },
+    ];
+    S.geo = [];
+    S.rolls.forEach((r, i) => {
+      const g = rollerGeo(2 * Math.PI * i / 16 + q.spin, q.roll);
+      S.geo.push(g);
+      r.side.setAttribute('d', poly(g.out, true));
+      r.out.setAttribute('d', poly(g.out, true));
+      r.shade.setAttribute('d', g.shade.length > 2 ? poly(g.shade, true) : '');
+      r.cap.setAttribute('d', poly(g.cap, true));
+      r.capl.setAttribute('d', poly(g.cap, true));
+      items.push({ g: r.g, d: depth(g.mid[0], g.mid[1], g.mid[2]) });
+    });
+    items.sort((a, b) => b.d - a.d);
+    if (items.some((it, i) => S.order[i] !== it.g)) { items.forEach((it) => S.scn.appendChild(it.g)); S.order = items.map((it) => it.g); }
+    // виноски йдуть за деталями
+    const toBox = (p, dz) => { const X = p[0] * s, Y = CY + (p[1] - dz * CE * K - CY) * s; return [(X - VB.x) / VB.w * 100, (Y - VB.y) / VB.h * 100]; };
+    const near = S.geo.reduce((best, g, i) => { const a = Math.atan2(g.capC[1], g.capC[0]); const d = Math.abs(Math.atan2(Math.sin(a - 150 * DEG), Math.cos(a - 150 * DEG))); return d < best.d ? { d, i } : best; }, { d: 9, i: 0 });
+    const cc = S.geo[near.i].capC;
+    const A = {
+      cupF: toBox(P(CUP.ro * Math.cos(300 * DEG), CUP.ro * Math.sin(300 * DEG), 10.75), q.cup),
+      cupT: toBox(P(32.6 * Math.cos(62 * DEG), 32.6 * Math.sin(62 * DEG), CUP.z1), q.cup),
+      roll: toBox(P(cc[0], cc[1], cc[2]), 0),
+      cone: toBox(P(19.7 * Math.cos(245 * DEG), 19.7 * Math.sin(245 * DEG), 17), q.cone),
+    };
+    S.box.querySelectorAll('.ca').forEach((w) => {
+      const [x, y] = A[w.dataset.a];
+      w.querySelectorAll('.mk,.an').forEach((e) => { e.style.left = x.toFixed(2) + '%'; e.style.top = y.toFixed(2) + '%'; });
+      w.querySelectorAll('.tg').forEach((e) => { e.style.left = 'calc(' + x.toFixed(2) + '% ' + (e.classList.contains('lf') ? '- ' : '+ ') + '8px)'; e.style.top = y.toFixed(2) + '%'; });
+    });
+  }
+
+  document.querySelectorAll('.sgb').forEach((box) => {
+    const S = build(box), sec = box.closest('.sv');
+    render(S, pose(0));
+    let t0 = null, raf = 0, on = true, loop = 0, last = 0;
+    const DRAW = [.2, 1.8], REV = [1.8, 2.9];
+    function frame(now) {
+      raf = 0;
+      if (t0 === null) t0 = now;
+      const t = (now - t0) / 1000;
+      if (t < REV[1] + .05) {
+        S.lines.forEach((e, i) => { const k = Math.min(1, Math.max(0, (t - DRAW[0] - (i % 12) * .03) / (DRAW[1] - DRAW[0] - .3))); e.style.strokeDashoffset = (1 - ease(k)).toFixed(3); });
+        const r = ease(Math.min(1, Math.max(0, (t - REV[0]) / (REV[1] - REV[0])))), h = r * (VB.h + 40);
+        S.crect.setAttribute('y', f1(CY - h / 2)); S.crect.setAttribute('height', f1(h));
+      } else {
+        if (!S.done) { S.done = true; S.fills.forEach((e) => { if (e.getAttribute('clip-path') === 'url(#brv-' + box.dataset.id + ')') e.removeAttribute('clip-path'); }); S.lines.forEach((e) => { e.style.strokeDashoffset = '0'; }); }
+        loop += Math.min(.1, (now - last) / 1000);
+        render(S, pose(loop));
+      }
+      last = now;
+      if (on) raf = requestAnimationFrame(frame);
+    }
+    const start = () => { if (!raf && on) { last = performance.now(); raf = requestAnimationFrame(frame); } };
+    const io = new IntersectionObserver((es) => es.forEach((e) => { on = e.isIntersecting; if (on && sec.classList.contains('in')) start(); }), { rootMargin: '200px 0px' });
+    io.observe(box);
+    new MutationObserver(() => { if (sec.classList.contains('in')) start(); }).observe(sec, { attributes: true, attributeFilter: ['class'] });
+    if (sec.classList.contains('in')) start();
+  });
+})();
+</script>
+"""
+
+
+def build(mode):
+    page = src
+    title = 'прототип v2 · SVG' if mode == 'svg' else 'прототип v2'
+    page = sub1(r'<title>.*?</title>', f'<title>Meridian Parts · каталог запчастин · {title}</title>', page, 1)
+    dsk, mob = page.index('<div class="dsk">'), page.index('<div class="mob">')
+    head, d, m = page[:dsk], page[dsk:mob], page[mob:]
+    page = head + part(d, False, mode) + part(m, True, mode)
+    js = JS.replace('PHOTO_IDS_JSON', json.dumps(PHOTO_IDS)) + (SVG_JS if mode == 'svg' else '')
+    css = CSS + (SVG_CSS if mode == 'svg' else '')
+    page = sub1(r'</style>', lambda _: css + '</style>', page, 1)
+    page = sub1(r'</script>\s*</body>', lambda _: '</script>' + js + '</body>', page, 1)
+    page = sub1(r'\. Wikimedia Commons, CC BY-SA 3\.0 / 4\.0</div>', lambda _: (
+        '. Wikimedia Commons, CC BY-SA 3.0 / 4.0. Логотипи BEDNAR і OLIMAC: '
+        '<a href="https://commons.wikimedia.org/wiki/File:BEDNAR_logo_2019_RGB.jpg" target="_blank" rel="noopener">Cz-bd-1</a>, '
+        '<a href="https://commons.wikimedia.org/wiki/File:OLIMAC_LOGO.png" target="_blank" rel="noopener">Agromacintosh</a>, '
+        'Wikimedia Commons, CC BY-SA 4.0. Логотипи виробників — торгові марки їхніх власників.</div>'), page, 2)
+    n_order = page.count('<span class="m">Замовити</span>')
+    assert n_order >= 16, n_order
+    page = page.replace('<span class="m">Замовити</span>', '<span class="m">' + roll('Замовити') + '</span>')
+    link = ('<a class="vlk" href="./">версія з відео →</a>' if mode == 'svg'
+            else '<a class="vlk" href="v1.html">перша версія прототипу →</a> · <a class="vlk" href="svg.html">версія з SVG →</a>')
+    page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · ' + link, page, 2)
+    return page
+
+
+for mode, name in (('video', 'index.html'), ('svg', 'svg.html')):
+    out = build(mode)
+    (ROOT / name).write_text(out, encoding='utf-8')
+    print(name, len(out))

@@ -10,7 +10,7 @@
 
 ## Версія 2 — головна
 
-Головна: https://yaladnich.github.io/meridian-prototype/ (перша версія — /v1.html)
+Головна: https://yaladnich.github.io/meridian-prototype/ (перша версія — /v1.html, підшипник у SVG замість відео — /svg.html)
 
 Та сама сторінка з прийомами референсу [heronaiapp.com](https://heronaiapp.com/):
 
