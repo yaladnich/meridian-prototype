@@ -65,14 +65,14 @@ def save_rgb(a, path, q):
 
 
 def brands():
+    """Слайди героя: повний розмір (до 1600 px) для ПК і 800 px для телефона; до кожного — креслення."""
     for n in BRANDS:
-        im = Image.open(ROOT / 'assets' / f'bp-{n}.webp').convert('RGB')
-        w = 1280 if n in ('jd', 'claas') else 900
-        if im.width > w:
-            im = im.resize((w, round(im.height * w / im.width)), Image.LANCZOS)
-        a = np.asarray(im).astype(np.float32) / 255
-        save_rgb(grade(a), OUT / f'bp-{n}.webp', 78)
-        save_rgb(on_paper(sketch(a)), OUT / f'bp-{n}-l.webp', 55)
+        src = Image.open(ROOT / 'assets' / f'bp-{n}.webp').convert('RGB')
+        for suf, w, q in (('', 1600, 80), ('-800', 800, 76)):
+            im = src if src.width <= w else src.resize((w, round(src.height * w / src.width)), Image.LANCZOS)
+            a = np.asarray(im).astype(np.float32) / 255
+            save_rgb(grade(a), OUT / f'bp-{n}{suf}.webp', q)
+            save_rgb(on_paper(sketch(a)), OUT / f'bp-{n}{suf}-l.webp', 55)
         print('brand', n)
 
 

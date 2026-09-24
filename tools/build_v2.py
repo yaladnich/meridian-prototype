@@ -1,12 +1,14 @@
 """Збирає v2.html з index.html.
 
-Зміни v2: герой «креслення → рендер → відео підшипника», бренди «креслення → кольорове фото» з єдиним грейдом,
-закріплений під час прокрутки блок «Послуги», ізометричні іконки в «Умовах роботи», стрічка виробників зі стрілками,
-координати й приціл у блоці замовлення, зерно паперу.
+Зміни v2: герой — слайди виробників «креслення → кольорове фото» з виносками; під героєм каталог;
+«Послуги» з підшипником «креслення → рендер → відео», кроки змінюються за таймером; ізометричні іконки
+в «Умовах роботи», стрічка виробників зі стрілками, координати й приціл у блоці замовлення, зерно паперу.
 
 python tools/build_v2.py
 """
+import collections
 import html
+import json
 import re
 from pathlib import Path
 
@@ -133,67 +135,135 @@ def icon_nut():
 
 ICONS = [icon_ring(), icon_box(), icon_sheets(), icon_nut()]
 
-# ---------- «Послуги» ----------
+# ---------- дані каталогу ----------
+M = json.loads(re.search(r'const M=(\[.*?\]);', src).group(1))
+RAW = json.loads(re.search(r'const RAW=(\[.*?\]);\n', src, re.S).group(1))
+COUNT = collections.Counter(M[r[2]] for r in RAW)
+ALT = dict(re.findall(r'<img src="assets/bp-(\w+)\.webp" alt="([^"]*)">', src))
+
+
+def plural(n, one, few, many):
+    a, b = n % 10, n % 100
+    if a == 1 and b != 11:
+        return one
+    if 2 <= a <= 4 and not 12 <= b <= 14:
+        return few
+    return many
+
+
+def fmt(n):
+    return f'{n:,}'.replace(',', '&#160;')
+
+
+# ---------- герой: слайди виробників ----------
+# виноски: (x %, y %, напис, плашка ліворуч) у координатах фото 3:2; mt — одна виноска для телефона
+SLIDES = [
+    dict(k='jd', b='John Deere', t=[(36, 74, 'Пальці протирізучі · 7', False), (51, 49, 'Датчики · 15', True), (70, 58, 'Ремені · 14', False)],
+         mt=(70, 58, 'Ремені · 14', True)),
+    dict(k='claas', b='CLAAS', t=[(47, 58, 'Підшипники · 10', False), (30, 38, 'Ущільнення · 7', True), (62, 70, 'Кільця · 9', False)],
+         mt=(44, 60, 'Підшипники · 10', False)),
+    dict(k='bednar', b='Bednar', t=[(25, 50, 'Диски · 4', False), (46, 66, 'Долота · 5', False), (57, 44, 'Кронштейни · 15', False)],
+         mt=(46, 66, 'Долота · 5', False)),
+    dict(k='geringhoff', b='Geringhoff', t=[(86, 64, 'Зірочки · 4', True), (74, 79, 'Ножі · 4', True)],
+         mt=(70, 66, 'Зірочки · 4', True)),
+    dict(k='olimac', b='OLIMAC', t=[(33, 67, 'Носки вальців · 2', False), (46, 56, 'Підшипники · 5', False)],
+         mt=(38, 58, 'Підшипники · 5', False)),
+    dict(k='kuhn', b='Kuhn', t=[(40, 44, 'Запчастини Kuhn · 15', False)],
+         mt=(40, 44, 'Запчастини Kuhn · 15', False)),
+    dict(k='amazone', b='AMAZONE', t=[(60, 74, 'Диски · 3', False), (54, 64, 'Амортизатори · 4', True)],
+         mt=(58, 70, 'Диски · 3', True)),
+]
+
+CROSSES = ''.join(f'<span class="cr" style="{a}: 10px; {b}: 8px;">+</span>' for a in ('left', 'right') for b in ('top', 'bottom'))
+RULERS = '<span class="ru h t"></span><span class="ru h b"></span><span class="ru v l"></span><span class="ru v r"></span>'
+
+
+def hero(mob, boot, intro_t):
+    n, suf = len(SLIDES), '-800' if mob else ''
+    slides, plates = [], []
+    for i, s in enumerate(SLIDES):
+        k, alt, first = s['k'], ALT[s['k']], i == 0
+
+        def img(cls, path, a):
+            if first:
+                attr = f'src="{path}" loading="lazy"' + (' fetchpriority="high"' if cls == 'bl' else '')
+            else:
+                attr = f'data-src="{path}"'
+            return f'<img class="{cls}" {attr} alt="{a}" decoding="async">'
+
+        marks = [s['mt']] if mob else s['t']
+        tags = ''.join(tag(x, y, t, .15 * j, left=lf) for j, (x, y, t, lf) in enumerate(marks))
+        style = ' style="--t0: .15s; --tw: 2.3s;"' if first else ''
+        slides.append(f'<div class="hs{" on" if first else ""}"{style}>'
+                      f'<div class="hl"><div class="hb">{img("bl", f"assets/v2/bp-{k}{suf}-l.webp", "")}</div></div>'
+                      f'<div class="hc"><div class="hb">{img("bc", f"assets/v2/bp-{k}{suf}.webp", alt)}</div></div>'
+                      f'<div class="ht"><div class="hb">{tags}</div></div>'
+                      f'<span class="bpl"></span><span class="bnd u"></span><span class="bnd d"></span><span class="bpn m"></span></div>')
+        c = COUNT[s['b']]
+        plates.append(f'<div class="hp{" on" if first else ""}"><div class="hph m"><span>Виробник</span><span>[{i + 1:02d}]</span></div>'
+                      f'<div class="hpb"><b>{s["b"]}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")} у&#160;каталозі</span>'
+                      f'<span class="hpc m g">{alt}</span></div>'
+                      f'<a href="#" class="hpl hv"><span class="tbg" aria-hidden="true"></span><span class="m">{roll("Запчастини " + s["b"])}</span>{ARROW}</a></div>')
+    if mob:
+        labs = '<div class="lab" style="left: 14px; top: 14px; --d: 3.2s;"><span class="m">[00] Каталог · v2</span></div>'
+    else:
+        labs = ('<div class="lab" style="left: 40px; top: 34px; --d: 3.2s;"><span class="m">[00] Каталог запчастин · v2</span>'
+                '<span class="m g">1&#160;237 товарів · 16 виробників</span></div>'
+                '<div class="lab" style="right: 40px; top: 34px; align-items: flex-end; --d: 3.3s;">'
+                '<span class="m g">John Deere · Bednar · Geringhoff · CLAAS</span><span class="m g">OLIMAC · Kuhn · AMAZONE · A&amp;I · AGV</span></div>')
+    controls = (f'<div class="hct"><span class="hnum m">01 / {n:02d}</span>'
+                f'<button type="button" class="slb bsb" data-hs="-1" aria-label="Попередній виробник">{ARROW}</button>'
+                f'<button type="button" class="slb" data-hs="1" aria-label="Наступний виробник">{ARROW}</button></div><span class="hpg"></span>')
+    return (f'<section class="hero v3h" aria-label="Виробники"><div class="hsl">{"".join(slides)}</div>{RULERS}{CROSSES}'
+            f'{boot}{intro_t}{labs}<div class="hps">{"".join(plates)}</div>{controls}</section>')
+
+
+# ---------- «Послуги»: підшипник грає сам, кроки змінюються за таймером ----------
 STEPS = [
-    dict(k='Постачання', h=['Постачання', 'запчастин'], img='gear', alt='Шестерня',
-         p='Прямі поставки від виробників: оптимальні ціни та швидкість доставки. Понад 20&#160;000 позицій на&#160;складах.',
-         tag=(84, 50, 'Шестерні · 14'), an=(40, 33, ['Шпонковий паз', 'z = 24']), mt=(30, 30, 'Шестерні · 14')),
-    dict(k='Консультації', h=['Консультації'], img='bearing', alt='Роликовий підшипник',
-         p='Немає номера? Назвіть марку й&#160;модель техніки. Менеджер підбере деталь і&#160;підкаже, що ще варто замінити.',
-         tag=(85, 52, 'Підшипники · 85'), an=(27, 44, ['Ролики циліндричні', '× 16']), mt=(30, 32, 'Підшипники · 85')),
-    dict(k='Установка', h=['Установка', 'запчастин'], img='sprocket', alt='Зірочка',
-         p='Діагностуємо, дефектуємо й&#160;ставимо деталі. Ремонтуємо John Deere: двигуни, коробки передач, мости, ТНВД, гідравліку.',
-         tag=(85, 48, 'Зірочки · 13'), an=(38, 40, ['Зірочка ланцюгова', 'z = 15']), mt=(30, 33, 'Зірочки · 13')),
+    dict(k='Постачання', h=['Постачання', 'запчастин'],
+         p='Прямі поставки від виробників: оптимальні ціни та швидкість доставки. Понад 20&#160;000 позицій на&#160;складах.'),
+    dict(k='Консультації', h=['Консультації'],
+         p='Немає номера? Назвіть марку й&#160;модель техніки. Менеджер підбере деталь і&#160;підкаже, що ще варто замінити.'),
+    dict(k='Установка', h=['Установка', 'запчастин'],
+         p='Діагностуємо, дефектуємо й&#160;ставимо деталі. Ремонтуємо John Deere: двигуни, коробки передач, мости, ТНВД, гідравліку.'),
 ]
 
 
-def story(mob):
+def bearing(mob, base):
+    if mob:
+        marks = tag(60, 24, 'Підшипники · 85', base, left=True)
+    else:
+        marks = (tag(25, 66, 'Підшипники · 85', base, left=True)
+                 + an(29.5, 42, ['Ролики циліндричні × 16', 'поз. 01'], base + .2, left=True)
+                 + an(64, 24.5, ['Кільце зовнішнє', 'поз. 02'], base + .35)
+                 + an(66.5, 44, ['Кільце внутрішнє', 'поз. 03'], base + .5))
+    return ('<div class="lay l" aria-hidden="true"><div class="stage"><img class="b3" src="assets/v2/bearing-l.webp" alt="" '
+            'width="1600" height="1000" loading="lazy" decoding="async"></div></div>'
+            '<div class="lay r"><div class="stage"><img class="b3" src="assets/v2/bearing.webp" '
+            'alt="Роликовий підшипник, технічна ілюстрація" width="1600" height="1000" loading="lazy" decoding="async">'
+            '<video class="b3 b3v" muted playsinline loop preload="none" aria-hidden="true" '
+            'data-src="assets/v2/bearing-1600.webm" data-src-m="assets/v2/bearing-960.webm"></video>'
+            f'{marks}</div></div><span class="bnd2 u"></span><span class="bnd2 d"></span><span class="spl2"></span><span class="spn m"></span>')
+
+
+def services(mob):
     n = len(STEPS)
-    hs, pts, hdr, txt, prg = [], [], [], [], []
+    hs, hdr, txt, prg = [], [], [], []
     for i, s in enumerate(STEPS):
         on = ' on' if i == 0 else ''
         lines = ''.join(f'<span class="ln"><span style="--i: {j};">{w}</span></span>' for j, w in enumerate(s['h']))
         hs.append(f'<h2 class="stt{on}">{lines}</h2>')
-        if mob:
-            x, y, t = s['mt']
-            marks = tag(x, y, t, .35)
-        else:
-            marks = tag(*s['tag'][:2], s['tag'][2], .35) + an(*s['an'][:2], s['an'][2], .6, left=True)
-        pts.append(f'<div class="spt{on}"><img class="spl" src="assets/v2/t-{s["img"]}-l.webp" alt="" loading="lazy" decoding="async">'
-                   f'<img class="spr" src="assets/v2/t-{s["img"]}.webp" alt="{s["alt"]}" loading="lazy" decoding="async">'
-                   f'<span class="sbd"><span class="sbp m"></span></span>{marks}</div>')
         hdr.append(f'<span class="scn{on}">[0{i + 1}] {s["k"]}</span>')
         txt.append(f'<p class="sct{on}">{s["p"]}</p>')
-        prg.append(f'<div class="spr2{" on" if i == 0 else ""}"><span class="m">0{i + 1} {s["k"]}</span><i><b></b></i></div>')
-    crs = ''.join(f'<span class="cr" style="{a}: 10px; {b}: 8px;">+</span>' for a in ('left', 'right') for b in ('top', 'bottom'))
-    return (f'<section class="story" data-sec=""><span class="sl"></span><div class="sto"><div class="stk">'
-            f'<span class="ru h t"></span><span class="ru h b"></span><span class="ru v l"></span><span class="ru v r"></span>{crs}'
+        prg.append(f'<div class="spr2{on}"><span class="m">0{i + 1} {s["k"]}</span><i><b></b></i></div>')
+    return (f'<section class="story sv" data-sec=""><span class="sl"></span><div class="stk">{RULERS}{CROSSES}'
             f'<span class="scl h"></span><span class="scl v"></span>'
-            f'<div class="slab m"><span>[06] Послуги</span><span class="g">Працюємо з людьми та для людей</span></div>'
+            f'<div class="slab m"><span>[05] Послуги</span><span class="g">Працюємо з людьми та для людей</span></div>'
             f'<div class="scnt m">01 / 0{n}</div>'
-            f'<div class="shd">{"".join(hs)}</div><div class="svis">{"".join(pts)}</div>'
+            f'<div class="shd">{"".join(hs)}</div><div class="svis2 v2h">{bearing(mob, 3.0)}</div>'
             f'<div class="scd"><div class="sch m">{"".join(hdr)}</div><div class="scb">{"".join(txt)}</div>'
-            f'<div class="scf m g">[Гортайте далі]</div></div>'
-            f'<div class="spg">{"".join(prg)}</div>'
-            f'</div></div></section>')
-
-
-# ---------- герой ----------
-def hero_stage(mob):
-    if mob:
-        marks = tag(60, 24, 'Підшипники · 85', 3.9, left=True)
-    else:
-        marks = (tag(25, 66, 'Підшипники · 85', 3.9, left=True)
-                 + an(29.5, 42, ['Ролики циліндричні × 16', 'поз. 01'], 4.1, left=True)
-                 + an(64, 24.5, ['Кільце зовнішнє', 'поз. 02'], 4.25)
-                 + an(66.5, 44, ['Кільце внутрішнє', 'поз. 03'], 4.4))
-    return ('<div class="lay l" aria-hidden="true"><div class="stage"><img class="b3" src="assets/v2/bearing-l.webp" alt="" '
-            'width="1600" height="1000" fetchpriority="high" decoding="async"></div></div>'
-            '<div class="lay r"><div class="stage"><img class="b3" src="assets/v2/bearing.webp" '
-            'alt="Роликовий підшипник, технічна ілюстрація" width="1600" height="1000" decoding="async">'
-            '<video class="b3 b3v" muted playsinline loop preload="none" aria-hidden="true" '
-            'data-src="assets/v2/bearing-1600.webm" data-src-m="assets/v2/bearing-960.webm"></video>'
-            f'{marks}</div></div><span class="bnd2 u"></span><span class="bnd2 d"></span>')
+            f'<div class="scf"><i></i></div></div>'
+            f'<div class="spg">{"".join(prg)}</div></div></section>')
 
 
 # ---------- заміни ----------
@@ -205,32 +275,28 @@ def sub1(pattern, repl, s, count, flags=re.S):
 
 page = src
 page = sub1(r'<title>.*?</title>', '<title>Meridian Parts · каталог запчастин · прототип v2</title>', page, 1)
-page = sub1(r'<section class="hero">', '<section class="hero v2h">', page, 2)
 
 dsk, mob = page.index('<div class="dsk">'), page.index('<div class="mob">')
 head, d, m = page[:dsk], page[dsk:mob], page[mob:]
 
 
 def part(s, is_mob):
-    s = sub1(r'<div class="stage">.*?</div>(?=<span class="pgl">)', lambda _: hero_stage(is_mob), s, 1)
-    if not is_mob:
-        s = sub1(r'Вид спереду · розріз А–А', 'Ізометрія · підшипник роликовий', s, 1)
-    s = sub1(r'<div class="mq" data-sec="">.*?</div></div>', lambda _: (
+    old = re.search(r'<section class="hero">.*?</section>', s, re.S).group(0)
+    boot = re.search(r'<div class="boot">.*?</div>', old, re.S).group(0)
+    intro_t = re.search(r'<div class="intro-t">.*?</div>', old, re.S).group(0)
+    s = sub1(r'<section class="hero">.*?</section>', lambda _: hero(is_mob, boot, intro_t), s, 1)
+    s = sub1(r'<section class="brands"[^>]*>.*?</section>', '', s, 1)
+    cat = re.search(r'<section class="cat"[^>]*>.*?</section>', s, re.S).group(0)
+    s = s.replace(cat, '', 1)
+    s = sub1(r'<div class="mq" data-sec="">.*?</div></div>', lambda _: cat + (
         '<div class="bstr" data-sec=""><span class="sl"></span><div class="bsh"><span class="m">Виробники в&#160;каталозі</span>'
         '<span class="bsa"><button type="button" class="slb bsb" data-bs="-1" aria-label="Попередні виробники">' + ARROW + '</button>'
         '<button type="button" class="slb" data-bs="1" aria-label="Наступні виробники">' + ARROW + '</button></span></div>'
         '<div class="bsv"><div class="bsk"></div></div>'
         '<div class="bsf m g">Оригінальні деталі та&#160;аналоги · John Deere, Bednar, Geringhoff, CLAAS та&#160;інші</div></div>'), s, 1)
-    s = sub1(r'<div class="bph">', '<div class="bph bv">', s, 2)
-    s = sub1(r'<a href="#" class="bsp">', '<a href="#" class="bsp bv">', s, 5)
-    s = sub1(r'<img src="assets/bp-(\w+)\.webp" alt="([^"]*)">', lambda mm: (
-        f'<img class="bl" src="assets/v2/bp-{mm[1]}-l.webp" alt="" loading="lazy" decoding="async">'
-        f'<img class="bc" src="assets/v2/bp-{mm[1]}.webp" alt="{mm[2]}" loading="lazy" decoding="async">'
-        f'<span class="bpl"></span><span class="bnd u"></span><span class="bnd d"></span><span class="bpn m"></span>'
-        f'<span class="bcp m">{mm[2]}</span>'), s, 7)
-    s = sub1(r'(?=<section class="facts")', lambda _: story(is_mob), s, 1)
-    s = sub1(r'\[06\] Умови роботи', '[07] Умови роботи', s, 1)
-    s = sub1(r'\[07\] Під замовлення', '[08] Під замовлення', s, 1)
+    for a, b in (('[03] Типи', '[04] Типи'), ('[02] Склад', '[03] Склад'), ('[01] Пошук', '[02] Пошук'), ('[05] Каталог', '[01] Каталог')):
+        s = sub1(re.escape(a), b, s, 1)
+    s = sub1(r'(?=<section class="facts")', lambda _: services(is_mob), s, 1)
     it = iter(ICONS)
     s = sub1(r'<div class="fb">', lambda _: '<div class="fb">' + next(it), s, 4)
     s = sub1(r'(<section class="ord rv-ln"[^>]*>)', lambda mm: mm[1] + (
@@ -252,24 +318,63 @@ CSS = r"""
 .dw::after{content:'';position:fixed;inset:0;z-index:60;pointer-events:none;background-image:url("GRAIN");background-size:220px 220px;opacity:.38}
 a.vlk{text-decoration:underline;text-decoration-color:var(--line2);text-underline-offset:3px}
 a.vlk:hover{color:var(--ink)}
-/* герой: креслення → рендер → відео */
-.v2h .stage{width:min(1040px,84%);aspect-ratio:16/10}
-.lay{position:absolute;inset:0}
-.lay.l{pointer-events:none;clip-path:inset(0 100% 0 0);animation:lnr 2.3s cubic-bezier(.65,.05,.3,1) .15s forwards}
-.lay.r{clip-path:inset(63% 0 37% 0);animation:rvl 1.2s cubic-bezier(.65,.05,.3,1) 2.45s forwards}
-@keyframes lnr{to{clip-path:inset(0 0 0 0)}}
-@keyframes rvl{to{clip-path:inset(0 0 0 0)}}
-.b3{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
-.b3v{opacity:0;transition:opacity .25s}
-.v2h.vid .b3v{opacity:1}
-.v2h.vid .lay.r img.b3{opacity:0;transition:opacity .25s .2s}
-.v2h.vid .lay.l{opacity:.35;transition:opacity 1s}
-.bnd2{position:absolute;left:0;right:0;top:63%;height:1px;background:var(--acc);opacity:0;z-index:3;pointer-events:none;animation:1.2s cubic-bezier(.65,.05,.3,1) 2.45s forwards}
-.bnd2.u{animation-name:bnU}.bnd2.d{animation-name:bnD}
 @keyframes bnU{0%{opacity:1}85%{opacity:1}to{top:0;opacity:0}}
 @keyframes bnD{0%{opacity:1}85%{opacity:1}to{top:100%;opacity:0}}
-.v2h .mk,.v2h .tg,.v2h .an{transition:opacity .35s}
-.v2h.ex .lay.r .mk,.v2h.ex .lay.r .tg,.v2h.ex .lay.r .an{opacity:0;pointer-events:none}
+@keyframes hsP{0%{opacity:1;transform:scaleX(0)}99%{opacity:1;transform:scaleX(1)}to{opacity:0;transform:scaleX(1)}}
+@keyframes hsO{0%,99%{opacity:1}to{opacity:0}}
+@keyframes hsG{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+/* герой: слайди виробників «креслення → фото» */
+.v3h{--hh:clamp(520px,46vw,660px);background-image:none}
+.hsl{position:absolute;inset:0;overflow:hidden;z-index:0}
+.hs{position:absolute;inset:0;visibility:hidden;--t0:0s;--tw:.9s}
+.hs.on{visibility:visible;z-index:2}
+.hs.pv{visibility:visible;z-index:1}
+.hl,.hc,.ht{position:absolute;inset:0;overflow:hidden}
+.ht{pointer-events:none;z-index:3}
+.ht .tg{pointer-events:auto}
+.hb{position:absolute;left:50%;top:50%;aspect-ratio:3/2;width:max(100%,calc(var(--hh) * 1.5));transform:translate(-50%,-50%)}
+.hb img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.hs.on .hl{animation:hsW var(--tw) cubic-bezier(.65,.05,.3,1) var(--t0) both}
+.hs.on .hc{animation:bcR 1.1s cubic-bezier(.65,.05,.3,1) calc(var(--t0) + var(--tw)) both}
+@keyframes hsW{from{clip-path:inset(0 100% 0 0)}to{clip-path:inset(0 0 0 0)}}
+@keyframes bcR{from{clip-path:inset(50% 0 50% 0)}to{clip-path:inset(0 0 0 0)}}
+.hs .bpl{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--acc);transform-origin:left;transform:scaleX(0);opacity:0;z-index:4;pointer-events:none}
+.hs.on .bpl{animation:hsP var(--tw) cubic-bezier(.65,.05,.3,1) var(--t0) both}
+.hs .bnd{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--acc);opacity:0;z-index:4;pointer-events:none}
+.hs.on .bnd{animation:1.1s cubic-bezier(.65,.05,.3,1) calc(var(--t0) + var(--tw)) forwards}
+.hs.on .bnd.u{animation-name:bnU}.hs.on .bnd.d{animation-name:bnD}
+.hs .bpn{position:absolute;left:40px;top:calc(50% - 26px);z-index:4;padding:1px 5px;background:var(--paper);opacity:0;counter-reset:n var(--n);pointer-events:none}
+.hs .bpn::after{content:counter(n) '%'}
+.hs.on .bpn{animation:cnt var(--tw) cubic-bezier(.65,.05,.3,1) var(--t0) both,hsO var(--tw) linear var(--t0) both}
+.hs .mk,.hs .tg{animation:none}
+.hs.on .mk{animation:pop .5s cubic-bezier(.3,1.6,.5,1) forwards;animation-delay:calc(var(--d) + var(--t0) + var(--tw) + .9s)}
+.hs.on .tg{animation:wipe .7s cubic-bezier(.6,.05,.3,1) forwards;animation-delay:calc(var(--d) + var(--t0) + var(--tw) + .9s)}
+.v3h .lab .m{padding:2px 6px;background:var(--paper)}
+.v3h .boot{animation:fadeOut .6s 2.9s forwards}
+.hps{position:absolute;left:28px;bottom:28px;z-index:5;display:grid;width:360px;animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) 3.6s backwards}
+.hp{grid-area:1/1;align-self:end;background:var(--paper);border:1px solid var(--ink);opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .3s,transform .45s cubic-bezier(.2,.7,.2,1),visibility 0s .45s}
+.hp.on{opacity:1;visibility:visible;transform:none;transition:opacity .35s .2s,transform .5s cubic-bezier(.2,.7,.2,1) .2s}
+.hph{display:flex;justify-content:space-between;padding:8px 12px;background:var(--ink);color:var(--paper)}
+.hpb{display:flex;flex-direction:column;gap:6px;padding:14px 12px}
+.hpb b{font-size:42px;line-height:1;font-weight:700;letter-spacing:-.045em;text-transform:uppercase;padding-bottom:.08em}
+.hpc{font-size:10.5px}
+.hpl{display:flex;align-items:center;justify-content:space-between;height:44px;padding:0 12px;border-top:1px solid var(--ink)}
+.hpl .ico{transition:transform .3s}.hpl:hover .ico{transform:translateX(4px)}
+.hct{position:absolute;right:28px;bottom:28px;z-index:5;display:flex;align-items:center;gap:6px;animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) 3.7s backwards}
+.hnum{margin-right:4px;padding:3px 6px;background:var(--paper)}
+.hct .slb{transition:background .25s,color .25s}.hct .slb:hover{background:var(--ink);color:var(--paper)}
+.hpg{position:absolute;left:0;right:0;bottom:0;height:3px;background:var(--acc);transform-origin:left;transform:scaleX(0);z-index:5}
+.hpg.run{animation:hsG var(--sd,7000ms) linear forwards}
+.hpg.ps{animation-play-state:paused}
+.mob .v3h{--hh:460px;height:460px}
+.mob .hs .bpn{left:14px}
+.mob .hps{left:8px;right:8px;bottom:8px;width:auto}
+.mob .hph,.mob .hpc{display:none}
+.mob .hpb{padding:10px 12px}
+.mob .hpb b{font-size:28px}
+.mob .hpl{height:40px}
+.mob .hct{right:8px;bottom:auto;top:8px}
+.mob .hct .slb{width:40px;height:40px}
 /* технічні виноски */
 .an{position:absolute;z-index:4;display:flex;align-items:center;transform:translateY(-50%);clip-path:inset(0 100% 0 0);animation:wipe .7s cubic-bezier(.6,.05,.3,1) forwards;animation-delay:var(--d)}
 .an.lf{flex-direction:row-reverse;transform:translate(-100%,-50%);clip-path:inset(0 0 0 100%)}
@@ -277,24 +382,83 @@ a.vlk:hover{color:var(--ink)}
 .an .al{width:40px;height:1px;background:var(--ink)}
 .an .at{padding:3px 6px;background:var(--paper);font-size:10.5px;line-height:1.4;color:var(--grey);white-space:nowrap;border-left:1px solid var(--ink)}
 .an.lf .at{border-left:0;border-right:1px solid var(--ink);text-align:right}
-.mob .v2h .stage{width:128%;aspect-ratio:16/10;top:54%}
-/* бренди: креслення → кольорове фото */
-.bv img{filter:none;mix-blend-mode:normal}
-.bv .bl,.bv .bc{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
-.bph.bv .bl,.bsp.bv .bl{clip-path:none}
-.bv .bc{animation:bcR 1.1s cubic-bezier(.65,.05,.3,1) .9s both paused}
-@keyframes bcR{from{clip-path:inset(50% 0 50% 0)}to{clip-path:inset(0 0 0 0)}}
-.bcell:hover .bph.bv img,.bsc:hover .bsp.bv img{filter:none;transform:scale(1.03)}
-.bv .bpl{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--acc);transform-origin:left;transform:scaleX(0);z-index:2;animation:pg .9s cubic-bezier(.65,.05,.3,1) forwards paused,fadeOut .2s .95s forwards paused}
-.bv .bnd{position:absolute;left:0;right:0;top:50%;height:1px;background:var(--acc);opacity:0;z-index:2;animation:1.1s cubic-bezier(.65,.05,.3,1) .9s forwards paused}
-.bv .bnd.u{animation-name:bnU}.bv .bnd.d{animation-name:bnD}
-.bv .bpn{position:absolute;left:10px;top:calc(50% - 22px);z-index:2;padding:1px 4px;background:var(--paper);counter-reset:n var(--n);animation:cnt .9s cubic-bezier(.65,.05,.3,1) forwards paused,fadeOut .2s .95s forwards paused}
-.bv .bpn::after{content:counter(n) '%'}
-.bv .bcp{position:absolute;left:10px;bottom:10px;z-index:2;padding:3px 6px;background:var(--paper);font-size:10.5px;opacity:0;transition:opacity .5s 2s}
-.bsp.bv .bcp{display:none}
-.bcell.in .bv>*,.bsc.in .bv>*{animation-play-state:running}
-.bcell.in .bv .bcp{opacity:1}
-.bph.bv .mk,.bph.bv .tg{animation-delay:calc(var(--d) + .8s)}
+/* «Послуги»: підшипник «креслення → рендер → відео», кроки за таймером */
+.story{position:relative}
+.sv .stk{position:relative;height:clamp(680px,94vh,880px);overflow:hidden;background-image:linear-gradient(rgba(38,40,38,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(38,40,38,.045) 1px,transparent 1px);background-size:32px 32px}
+.stk .ru,.stk .cr{animation:none}
+.scl{position:absolute;pointer-events:none;opacity:.7}
+.scl.h{left:28px;right:28px;top:57%;height:1px;background:repeating-linear-gradient(90deg,var(--line2) 0 24px,transparent 24px 30px,var(--line2) 30px 33px,transparent 33px 39px)}
+.scl.v{top:28px;bottom:28px;left:50%;width:1px;background:repeating-linear-gradient(180deg,var(--line2) 0 24px,transparent 24px 30px,var(--line2) 30px 33px,transparent 33px 39px)}
+.slab{position:absolute;left:40px;top:34px;display:flex;flex-direction:column;gap:6px;z-index:3}
+.scnt{position:absolute;right:40px;top:34px;z-index:3}
+.shd{position:absolute;left:0;right:0;top:9vh;height:2.2em;font-size:clamp(40px,4.6vw,72px);z-index:3;pointer-events:none}
+.stt{position:absolute;left:0;right:0;top:0;margin:0;text-align:center;font-size:1em;line-height:1;font-weight:700;letter-spacing:-.045em;text-transform:uppercase;opacity:0;transition:opacity .2s .55s}
+.stt.on{opacity:1;transition-delay:0s}
+.stt .ln>span{animation:none;transform:translateY(110%);transition:transform .8s cubic-bezier(.2,.7,.2,1);transition-delay:calc(var(--i,0)*90ms)}
+.stt.on .ln>span{transform:none}
+.stt.off .ln>span{transform:translateY(-110%)}
+.svis2{position:absolute;left:50%;top:57%;width:min(980px,68%);aspect-ratio:16/10;transform:translate(-50%,-50%);z-index:2}
+.sv .v2h .stage{left:0;top:0;width:100%;height:100%;aspect-ratio:auto;transform:none}
+.lay{position:absolute;inset:0}
+.lay.l{pointer-events:none;clip-path:inset(0 100% 0 0);animation:lnr 1.6s cubic-bezier(.65,.05,.3,1) .2s forwards paused}
+.lay.r{clip-path:inset(50% 0 50% 0);animation:rvl 1.1s cubic-bezier(.65,.05,.3,1) 1.8s forwards paused}
+@keyframes lnr{to{clip-path:inset(0 0 0 0)}}
+@keyframes rvl{to{clip-path:inset(0 0 0 0)}}
+.bnd2{position:absolute;left:-12%;right:-12%;top:50%;height:1px;background:var(--acc);opacity:0;z-index:3;pointer-events:none;animation:1.1s cubic-bezier(.65,.05,.3,1) 1.8s forwards paused}
+.bnd2.u{animation-name:bnU}.bnd2.d{animation-name:bnD}
+.spl2{position:absolute;left:-12%;right:-12%;top:50%;height:1px;background:var(--acc);transform-origin:left;transform:scaleX(0);opacity:0;z-index:3;pointer-events:none;animation:hsP 1.6s cubic-bezier(.65,.05,.3,1) .2s both paused}
+.spn{position:absolute;left:-12%;top:calc(50% - 24px);z-index:3;padding:1px 5px;background:var(--paper);opacity:0;counter-reset:n var(--n);pointer-events:none;animation:cnt 1.6s cubic-bezier(.65,.05,.3,1) .2s both paused,hsO 1.6s linear .2s both paused}
+.spn::after{content:counter(n) '%'}
+.sv.in .lay.l,.sv.in .lay.r,.sv.in .bnd2,.sv.in .spl2,.sv.in .spn{animation-play-state:running}
+.sv .mk,.sv .tg,.sv .an{animation-play-state:paused}
+.sv.in .mk,.sv.in .tg,.sv.in .an{animation-play-state:running}
+.b3{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.b3v{opacity:0;transition:opacity .25s}
+.v2h.vid .b3v{opacity:1}
+.v2h.vid .lay.r img.b3{opacity:0;transition:opacity .25s .2s}
+.v2h.vid .lay.l{opacity:.35;transition:opacity 1s}
+.v2h .mk,.v2h .tg,.v2h .an{transition:opacity .35s}
+.v2h.ex .lay.r .mk,.v2h.ex .lay.r .tg,.v2h.ex .lay.r .an{opacity:0;pointer-events:none}
+.scd{position:absolute;left:40px;bottom:40px;width:340px;z-index:4;background:var(--paper);border:1px solid var(--ink)}
+.sch{display:grid;background:var(--ink);color:var(--paper);padding:9px 12px}
+.scb{display:grid;padding:14px 12px 16px}
+.sch>span,.sct{grid-area:1/1;opacity:0;transform:translateY(8px);transition:opacity .35s,transform .45s cubic-bezier(.2,.7,.2,1)}
+.sch>span.on,.sct.on{opacity:1;transform:none;transition-delay:.12s}
+.sct{margin:0;font-size:15px;line-height:1.5}
+.scf{height:3px;background:var(--line)}
+.scf i{display:block;height:100%;background:var(--acc);transform-origin:left;transform:scaleX(0)}
+.spg{position:absolute;right:40px;bottom:40px;width:260px;display:flex;flex-direction:column;gap:12px;z-index:4}
+.spr2{display:flex;flex-direction:column;gap:6px;color:var(--grey);transition:color .3s}
+.spr2.on{color:var(--ink)}
+.spr2 i{display:block;height:2px;background:var(--line)}
+.spr2 b{display:block;height:100%;background:var(--ink);transform-origin:left;transform:scaleX(0)}
+.spr2.dn b{transform:none}
+.scf i.run,.spr2 b.run{animation:hsG var(--sd,5000ms) linear forwards}
+.sv.ps .scf i,.sv.ps .spr2 b{animation-play-state:paused}
+@media (max-width:1400px){.hd .lg{width:220px}.hd nav a{width:112px}.hd .tel{padding:0 14px}.hd .cart{padding:0 14px}.hd .msg{padding:0 4px}}
+.mob .sv .stk{height:620px;background-size:24px 24px}
+.mob .slab{left:14px;top:16px}
+.mob .slab .g{display:none}
+.mob .scnt{right:14px;top:16px}
+.mob .stk .cr{display:none}
+.mob .shd{top:52px;font-size:34px}
+.mob .svis2{width:124%;top:47%}
+.mob .scd{left:8px;right:8px;bottom:8px;width:auto}
+.mob .sct{font-size:14px}
+.mob .spg{display:none}
+.mob .scl.h{top:47%;left:14px;right:14px}
+.mob .scl.v{top:14px;bottom:14px}
+.mob .ord .xy{display:none}
+/* ізометричні іконки */
+.iso{display:block;width:190px;height:auto;margin:-10px 0 2px -12px;overflow:visible}
+.iso .dr{stroke-width:1.2}
+.iso .hd{fill:none;stroke:var(--grey);stroke-width:.9;stroke-dasharray:3 3;opacity:0;transition:opacity .8s 1.3s}
+.iso .ia{fill:var(--acc);transform-box:fill-box;transform-origin:center;transform:scale(0);transition:transform .5s cubic-bezier(.3,1.6,.5,1) 1.5s}
+.facts .iso .dr{animation-play-state:paused}
+.facts.in .iso .dr{animation-play-state:running}
+.facts.in .iso .hd{opacity:1}
+.facts.in .iso .ia{transform:none}
+.mob .iso{width:150px;margin:-6px 0 0 -8px}
 /* стрічка виробників */
 .bstr{position:relative}
 .bsh{display:flex;align-items:center;justify-content:space-between;padding:8px 8px 8px 20px;border-bottom:1px solid var(--line)}
@@ -312,68 +476,6 @@ a.vlk:hover{color:var(--ink)}
 .mob .bsc2{flex-basis:50%;height:84px;padding:0 16px}
 .mob .bsc2 b{font-size:19px}
 .mob .bsf{padding:8px 16px}
-/* «Послуги»: закріплений блок */
-.story{position:relative}
-.sto{position:relative;height:340vh}
-.stk{position:sticky;top:0;height:100vh;overflow:hidden;background-image:linear-gradient(rgba(38,40,38,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(38,40,38,.045) 1px,transparent 1px);background-size:32px 32px}
-.stk .ru,.stk .cr{animation:none}
-.scl{position:absolute;pointer-events:none;opacity:.7}
-.scl.h{left:28px;right:28px;top:56%;height:1px;background:repeating-linear-gradient(90deg,var(--line2) 0 24px,transparent 24px 30px,var(--line2) 30px 33px,transparent 33px 39px)}
-.scl.v{top:28px;bottom:28px;left:50%;width:1px;background:repeating-linear-gradient(180deg,var(--line2) 0 24px,transparent 24px 30px,var(--line2) 30px 33px,transparent 33px 39px)}
-.slab{position:absolute;left:40px;top:34px;display:flex;flex-direction:column;gap:6px;z-index:3}
-.scnt{position:absolute;right:40px;top:34px;z-index:3}
-.shd{position:absolute;left:0;right:0;top:9vh;height:2.2em;font-size:clamp(40px,4.6vw,72px);z-index:3;pointer-events:none}
-.stt{position:absolute;left:0;right:0;top:0;margin:0;text-align:center;font-size:1em;line-height:1;font-weight:700;letter-spacing:-.045em;text-transform:uppercase;opacity:0;transition:opacity .2s .55s}
-.stt.on{opacity:1;transition-delay:0s}
-.stt .ln>span{animation:none;transform:translateY(110%);transition:transform .8s cubic-bezier(.2,.7,.2,1);transition-delay:calc(var(--i,0)*90ms)}
-.stt.on .ln>span{transform:none}
-.stt.off .ln>span{transform:translateY(-110%)}
-.svis{position:absolute;left:50%;top:57%;width:min(80vh,780px);aspect-ratio:1;transform:translate(-50%,-50%);z-index:2}
-.spt{position:absolute;inset:0;opacity:0;visibility:hidden;transition:opacity .45s,visibility 0s .45s}
-.spt.on{opacity:1;visibility:visible;transition:opacity .45s}
-.spl,.spr{position:absolute;inset:0;width:100%;height:100%;display:block}
-.spr{clip-path:inset(0 0 calc(100% - var(--y,0%)) 0)}
-.sbd{position:absolute;left:-18%;right:-18%;top:var(--y,0%);height:1px;background:var(--acc);opacity:var(--bo,0);z-index:3;pointer-events:none}
-.sbp{position:absolute;left:0;bottom:6px;padding:1px 4px;background:var(--paper)}
-.spt .mk,.spt .tg,.spt .an{animation-play-state:paused}
-.story.in .spt.on .mk,.story.in .spt.on .tg,.story.in .spt.on .an{animation-play-state:running}
-.scd{position:absolute;left:40px;bottom:40px;width:340px;z-index:4;background:var(--paper);border:1px solid var(--ink)}
-.sch{display:grid;background:var(--ink);color:var(--paper);padding:9px 12px}
-.scb{display:grid;padding:14px 12px 16px}
-.sch>span,.sct{grid-area:1/1;opacity:0;transform:translateY(8px);transition:opacity .35s,transform .45s cubic-bezier(.2,.7,.2,1)}
-.sch>span.on,.sct.on{opacity:1;transform:none;transition-delay:.12s}
-.sct{margin:0;font-size:15px;line-height:1.5}
-.scf{padding:8px 12px;border-top:1px solid var(--line);font-size:11px}
-.spg{position:absolute;right:40px;bottom:40px;width:260px;display:flex;flex-direction:column;gap:12px;z-index:4}
-.spr2{display:flex;flex-direction:column;gap:6px;color:var(--grey);transition:color .3s}
-.spr2.on{color:var(--ink)}
-.spr2 i{display:block;height:2px;background:var(--line)}
-.spr2 b{display:block;height:100%;background:var(--ink);transform-origin:left;transform:scaleX(var(--p,0))}
-@media (max-width:1240px){.dsk .svis{left:56%}.hd .cart{padding:0 14px}.hd .msg{padding:0 4px}}
-.mob .sto{height:320vh}
-.mob .stk{height:100svh;background-size:24px 24px}
-.mob .slab{left:14px;top:16px}
-.mob .slab .g{display:none}
-.mob .scnt{right:14px;top:16px}
-.mob .stk .cr{display:none}
-.mob .ord .xy{display:none}
-.mob .shd{top:52px;font-size:34px}
-.mob .svis{width:min(100vw,56svh);top:49%}
-.mob .scd{left:8px;right:8px;bottom:8px;width:auto}
-.mob .sct{font-size:14px}
-.mob .spg{display:none}
-.mob .scl.h{top:48%;left:14px;right:14px}
-.mob .scl.v{top:14px;bottom:14px}
-/* ізометричні іконки */
-.iso{display:block;width:190px;height:auto;margin:-10px 0 2px -12px;overflow:visible}
-.iso .dr{stroke-width:1.2}
-.iso .hd{fill:none;stroke:var(--grey);stroke-width:.9;stroke-dasharray:3 3;opacity:0;transition:opacity .8s 1.3s}
-.iso .ia{fill:var(--acc);transform-box:fill-box;transform-origin:center;transform:scale(0);transition:transform .5s cubic-bezier(.3,1.6,.5,1) 1.5s}
-.facts .iso .dr{animation-play-state:paused}
-.facts.in .iso .dr{animation-play-state:running}
-.facts.in .iso .hd{opacity:1}
-.facts.in .iso .ia{transform:none}
-.mob .iso{width:150px;margin:-6px 0 0 -8px}
 /* блок замовлення: координати й приціл */
 .ord .xy{position:absolute;z-index:2;font-size:10px;letter-spacing:.02em;color:#8E8D86;pointer-events:none}
 .ord .xy[data-c=tl]{left:10px;top:8px}.ord .xy[data-c=tr]{right:10px;top:8px}
@@ -387,15 +489,62 @@ a.vlk:hover{color:var(--ink)}
 JS = r"""
 <script>
 (function () {
-  const ARROW = "ARROW_SVG";
   const vis = (el) => el && el.getClientRects().length > 0;
 
-  // герой: після проявлення рендера вмикається відео з альфою (Safari без альфи у WebM — лишається рендер)
+  // герой: слайди виробників, автопрокрутка, пауза під мишею, свайп на телефоні
+  const initHero = (h) => {
+    if (h.dataset.ok || !vis(h)) return;
+    h.dataset.ok = '1';
+    const sl = Array.from(h.querySelectorAll('.hs')), pl = Array.from(h.querySelectorAll('.hp'));
+    const num = h.querySelector('.hnum'), pg = h.querySelector('.hpg'), n = sl.length;
+    const pad = (x) => (x < 10 ? '0' : '') + x;
+    const HOLD = 5;
+    let i = 0, t = 0, u = 0, hover = false;
+    const load = (k) => sl[(k + n) % n].querySelectorAll('img[data-src]').forEach((im) => { im.src = im.dataset.src; im.removeAttribute('data-src'); });
+    function arm(ms) {
+      clearTimeout(t);
+      pg.classList.remove('run', 'ps'); void pg.offsetWidth;
+      pg.style.setProperty('--sd', ms + 'ms'); pg.classList.add('run');
+      if (hover) pg.classList.add('ps'); else t = setTimeout(() => show(i + 1), ms);
+    }
+    function show(k) {
+      const prev = i;
+      i = (k + n) % n;
+      if (prev === i) return;
+      sl.forEach((s) => s.classList.remove('pv'));
+      sl[prev].classList.remove('on'); sl[prev].classList.add('pv');
+      const s = sl[i];
+      s.style.setProperty('--t0', '0s'); s.style.setProperty('--tw', '.9s');
+      s.classList.remove('on'); void s.offsetWidth; s.classList.add('on');
+      pl.forEach((p, j) => p.classList.toggle('on', j === i));
+      num.textContent = pad(i + 1) + ' / ' + pad(n);
+      load(i + 1); load(i - 1);
+      clearTimeout(u); u = setTimeout(() => sl[prev].classList.remove('pv'), 2100);
+      arm((2 + HOLD) * 1000);
+    }
+    h.querySelectorAll('[data-hs]').forEach((b) => b.addEventListener('click', () => show(i + +b.dataset.hs)));
+    h.addEventListener('pointerenter', (e) => { if (e.pointerType !== 'mouse') return; hover = true; clearTimeout(t); pg.classList.add('ps'); });
+    h.addEventListener('pointerleave', (e) => { if (e.pointerType !== 'mouse') return; hover = false; arm(HOLD * 1000); });
+    let x0 = null;
+    h.addEventListener('touchstart', (e) => { x0 = e.touches[0].clientX; }, { passive: true });
+    h.addEventListener('touchend', (e) => {
+      if (x0 === null) return;
+      const dx = e.changedTouches[0].clientX - x0; x0 = null;
+      if (Math.abs(dx) > 40) show(i + (dx < 0 ? 1 : -1));
+    });
+    load(1); load(n - 1);
+    arm((.15 + 2.3 + 1.1 + HOLD) * 1000);
+  };
+  const heroes = document.querySelectorAll('.v3h');
+  heroes.forEach(initHero);
+  window.addEventListener('resize', () => heroes.forEach(initHero));
+
+  // підшипник: після проявлення рендера вмикається відео з альфою (Safari без альфи у WebM — лишається рендер)
   const ua = navigator.userAgent;
   const alphaOK = !(/Safari\//.test(ua) && !/(Chrome|Chromium|CriOS|Edg|Firefox|FxiOS)\//.test(ua));
   document.querySelectorAll('.v2h').forEach((h) => {
     const r = h.querySelector('.lay.r'), v = h.querySelector('.b3v');
-    let ready = false, revealed = false, onScreen = true;
+    let ready = false, revealed = false, onScreen = false, loaded = false;
     const go = () => { if (ready && revealed && onScreen) v.play().catch(() => {}); };
     r.addEventListener('animationend', (e) => { if (e.animationName === 'rvl') { revealed = true; go(); } });
     if (!v || !alphaOK) return;
@@ -406,29 +555,51 @@ JS = r"""
     v.addEventListener('playing', () => h.classList.add('vid'), { once: true });
     v.addEventListener('canplaythrough', () => { ready = true; go(); }, { once: true });
     const load = () => {
-      if (!vis(h)) return;
+      if (loaded) return;
+      loaded = true;
       v.src = matchMedia('(max-width: 899px)').matches ? v.dataset.srcM : v.dataset.src;
       v.preload = 'auto';
       v.load();
     };
-    if (document.readyState === 'complete') load(); else window.addEventListener('load', load, { once: true });
-    if ('IntersectionObserver' in window) {
-      new IntersectionObserver((es) => es.forEach((e) => {
-        onScreen = e.isIntersecting;
-        if (onScreen) go(); else v.pause();
-      })).observe(h);
+    new IntersectionObserver((es) => es.forEach((e) => {
+      onScreen = e.isIntersecting;
+      if (onScreen) { load(); go(); } else v.pause();
+    }), { rootMargin: '300px 0px' }).observe(h);
+  });
+
+  // «Послуги»: кроки змінюються самі, поки блок на екрані
+  document.querySelectorAll('.sv').forEach((s) => {
+    const tts = s.querySelectorAll('.stt'), chs = s.querySelectorAll('.scn'), cts = s.querySelectorAll('.sct');
+    const prs = Array.from(s.querySelectorAll('.spr2')), bar = s.querySelector('.scf i'), cnt = s.querySelector('.scnt');
+    const n = tts.length, D = 5000;
+    let i = 0, t = 0, on = false;
+    const run = (el) => { el.classList.remove('run'); void el.offsetWidth; el.classList.add('run'); };
+    function go(k) {
+      const prev = i;
+      i = k % n;
+      tts.forEach((e, j) => { e.classList.toggle('on', j === i); e.classList.toggle('off', j === prev && j !== i); });
+      [chs, cts].forEach((l) => l.forEach((e, j) => e.classList.toggle('on', j === i)));
+      prs.forEach((e, j) => { e.classList.toggle('on', j === i); e.classList.toggle('dn', j < i); e.querySelector('b').classList.remove('run'); });
+      run(prs[i].querySelector('b')); run(bar);
+      cnt.textContent = '0' + (i + 1) + ' / 0' + n;
+      clearTimeout(t); t = setTimeout(() => go(i + 1), D);
     }
+    s.style.setProperty('--sd', D + 'ms');
+    new IntersectionObserver((es) => es.forEach((e) => {
+      if (e.isIntersecting && !on) { on = true; s.classList.remove('ps'); go(i); }
+      else if (!e.isIntersecting && on) { on = false; clearTimeout(t); s.classList.add('ps'); }
+    }), { threshold: .25 }).observe(s);
   });
 
   // стрічка виробників: кількість товарів рахується з каталогу
-  const cnt = {};
-  CAT.forEach((p) => { cnt[p.m] = (cnt[p.m] || 0) + 1; });
-  const brands = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
-  const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const cntB = {};
+  CAT.forEach((p) => { cntB[p.m] = (cntB[p.m] || 0) + 1; });
+  const brands = Object.keys(cntB).sort((a, b) => cntB[b] - cntB[a]);
+  const esc = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   document.querySelectorAll('.bstr').forEach((st) => {
     const trk = st.querySelector('.bsk');
     trk.innerHTML = brands.map((b) => '<a href="#" class="bsc2"><b>' + esc(b) + '</b><span class="m g">'
-      + fmtN(cnt[b]) + ' ' + plural(cnt[b], 'товар', 'товари', 'товарів') + '</span></a>').join('');
+      + fmtN(cntB[b]) + ' ' + plural(cntB[b], 'товар', 'товари', 'товарів') + '</span></a>').join('');
     let i = 0, t = 0, hover = false;
     const per = () => (matchMedia('(max-width: 899px)').matches ? 2 : 5);
     const show = () => { const mx = brands.length - per(); if (i > mx) i = 0; if (i < 0) i = mx; trk.style.transform = 'translateX(' + (-i * 100 / per()) + '%)'; };
@@ -438,43 +609,6 @@ JS = r"""
     st.addEventListener('pointerleave', () => { hover = false; });
     show(); next();
   });
-
-  // «Послуги»: крок за прокруткою, смуга проявляє рендер деталі
-  const ease = (x) => (x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
-  const stories = Array.from(document.querySelectorAll('.story')).map((s) => ({
-    sto: s.querySelector('.sto'), cur: -1, cnt: s.querySelector('.scnt'),
-    tts: s.querySelectorAll('.stt'), pts: Array.from(s.querySelectorAll('.spt')),
-    chs: s.querySelectorAll('.scn'), cts: s.querySelectorAll('.sct'), prs: s.querySelectorAll('.spr2'),
-  }));
-  let raf = 0;
-  function upd() {
-    raf = 0;
-    const vh = window.innerHeight || 800;
-    stories.forEach((o) => {
-      const r = o.sto.getBoundingClientRect();
-      if (!r.height || r.bottom < -vh || r.top > vh * 2) return;
-      const n = o.pts.length;
-      const p = Math.max(0, Math.min(.9999, -r.top / (r.height - vh)));
-      const seg = p * n, i = Math.floor(seg), t = seg - i;
-      if (i !== o.cur) {
-        o.tts.forEach((e, k) => { e.classList.toggle('on', k === i); e.classList.toggle('off', k < i); });
-        [o.pts, o.chs, o.cts, o.prs].forEach((l) => l.forEach((e, k) => e.classList.toggle('on', k === i)));
-        o.pts.forEach((e, k) => { if (k !== i) { e.style.setProperty('--y', k < i ? '100%' : '0%'); e.style.setProperty('--bo', 0); } });
-        o.cnt.textContent = '0' + (i + 1) + ' / 0' + n;
-        o.cur = i;
-      }
-      const y = ease(Math.max(0, Math.min(1, (t - .06) / .6)));
-      const pt = o.pts[i];
-      pt.style.setProperty('--y', (y >= 1 ? 100 : 22 + y * 56).toFixed(2) + '%');
-      pt.style.setProperty('--bo', y > 0 && y < 1 ? 1 : 0);
-      pt.querySelector('.sbp').textContent = Math.round(y * 100) + '%';
-      o.prs.forEach((e, k) => e.style.setProperty('--p', k < i ? 1 : k > i ? 0 : t.toFixed(3)));
-    });
-  }
-  const req = () => { if (!raf) raf = requestAnimationFrame(upd); };
-  window.addEventListener('scroll', req, { passive: true });
-  window.addEventListener('resize', req);
-  upd();
 
   // блок замовлення: координати кутів і приціл за курсором
   document.querySelectorAll('.ord').forEach((o) => {
@@ -499,13 +633,11 @@ JS = r"""
   });
 })();
 </script>
-""".replace('ARROW_SVG', ARROW.replace('"', '\\"'))
+"""
 
 page = sub1(r'</style>', lambda _: CSS + '</style>', page, 1)
 page = sub1(r'</script>\s*</body>', lambda _: '</script>' + JS + '</body>', page, 1)
 page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · <a class="vlk" href="index.html">прототип v2, перша версія →</a>', page, 2)
-page = sub1(r'\[00\] Каталог запчастин<', '[00] Каталог запчастин · v2<', page, 1)
-page = sub1(r'\[00\] Каталог · 1&#160;237 товарів', '[00] Каталог · v2', page, 1)
 
 (ROOT / 'v2.html').write_text(page, encoding='utf-8')
 print('v2.html', len(page))
