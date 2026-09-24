@@ -140,6 +140,7 @@ M = json.loads(re.search(r'const M=(\[.*?\]);', src).group(1))
 RAW = json.loads(re.search(r'const RAW=(\[.*?\]);\n', src, re.S).group(1))
 COUNT = collections.Counter(M[r[2]] for r in RAW)
 ALT = dict(re.findall(r'<img src="assets/bp-(\w+)\.webp" alt="([^"]*)">', src))
+PHOTO_IDS = sorted({int(x) for x in re.findall(r'<img src="assets/p(\d+)\.webp"', src)})
 
 
 def plural(n, one, few, many):
@@ -258,7 +259,7 @@ def services(mob):
         prg.append(f'<div class="spr2{on}"><span class="m">0{i + 1} {s["k"]}</span><i><b></b></i></div>')
     return (f'<section class="story sv" data-sec=""><span class="sl"></span><div class="stk">{RULERS}{CROSSES}'
             f'<span class="scl h"></span><span class="scl v"></span>'
-            f'<div class="slab m"><span>[05] Послуги</span><span class="g">Працюємо з людьми та для людей</span></div>'
+            f'<div class="slab m"><span>[04] Послуги</span><span class="g">Працюємо з людьми та для людей</span></div>'
             f'<div class="scnt m">01 / 0{n}</div>'
             f'<div class="shd">{"".join(hs)}</div><div class="svis2 v2h">{bearing(mob, 3.0)}</div>'
             f'<div class="scd"><div class="sch m">{"".join(hdr)}</div><div class="scb">{"".join(txt)}</div>'
@@ -271,6 +272,30 @@ def sub1(pattern, repl, s, count, flags=re.S):
     out, n = re.subn(pattern, repl, s, flags=flags)
     assert n == count, (pattern[:60], n, count)
     return out
+
+
+def reroll(s, old, new, count):
+    """Замінює напис із «прокруткою літер»: текст для читачів екрана і згенеровані літери."""
+    out, n, pos = [], 0, 0
+    key = f'<span class="sr">{old}</span><span class="rl" aria-hidden="true">'
+    while True:
+        i = s.find(key, pos)
+        if i < 0:
+            break
+        j, depth = i + len(f'<span class="sr">{old}</span>'), 0
+        k = j
+        while True:
+            o, c = s.find('<span', k), s.find('</span>', k)
+            if o != -1 and o < c:
+                depth, k = depth + 1, o + 5
+            else:
+                depth, k = depth - 1, c + 7
+                if depth == 0:
+                    break
+        out.append(s[pos:i] + roll(new))
+        pos, n = k, n + 1
+    assert n == count, (old, n, count)
+    return ''.join(out) + s[pos:]
 
 
 page = src
@@ -288,14 +313,36 @@ def part(s, is_mob):
     s = sub1(r'<section class="brands"[^>]*>.*?</section>', '', s, 1)
     cat = re.search(r'<section class="cat"[^>]*>.*?</section>', s, re.S).group(0)
     s = s.replace(cat, '', 1)
+    srch = re.search(r'<section class="srch"[^>]*>.*?</section>', s, re.S).group(0)
+    s = s.replace(srch, '', 1)
+    sbox = re.search(r'<div class="swrap">(.*?)<div class="sdd"[^>]*></div></div>', srch, re.S).group(1)
+    ex = re.search(r'<div class="ex">.*?</div>', srch, re.S).group(0)
+    cat = cat.replace('<section class="cat" data-sec="">', '<section class="cat" data-sec="">' if is_mob else '<section class="cat" id="search" data-sec="">', 1)
+    if is_mob:
+        cat = cat.replace('<span class="m">[05] Каталог</span></div>', '<span class="m">[05] Каталог</span><span class="m g ccn">1&#160;237 товарів</span></div>', 1)
+    else:
+        cat = cat.replace('<span class="m g">1&#160;237 товарів</span></div>', '<span class="m g ccn">1&#160;237 товарів</span></div>', 1)
+    assert 'ccn' in cat
+    i = cat.index('<div class="filt"')
+    cat = cat[:i] + f'<div class="csr">{sbox}{ex}</div>' + cat[i:]
+    grid = 'pg2' if is_mob else 'pg4'
+    dyn = (f'<div class="cdyn"><div class="{grid} cgr"></div><div class="cnf"></div>'
+           '<div class="cmr"><span class="m g"></span><button type="button" class="btn-a hv inv"><span class="tbg" aria-hidden="true"></span>'
+           f'<span class="m">Показати ще</span>{ARROW}</button></div></div>')
+    anchor = '<a href="#" class="morem' if is_mob else '<div class="pager"'
+    i = cat.index(anchor)
+    cat = cat[:i] + dyn + cat[i:]
     s = sub1(r'<div class="mq" data-sec="">.*?</div></div>', lambda _: cat + (
         '<div class="bstr" data-sec=""><span class="sl"></span><div class="bsh"><span class="m">Виробники в&#160;каталозі</span>'
         '<span class="bsa"><button type="button" class="slb bsb" data-bs="-1" aria-label="Попередні виробники">' + ARROW + '</button>'
         '<button type="button" class="slb" data-bs="1" aria-label="Наступні виробники">' + ARROW + '</button></span></div>'
         '<div class="bsv"><div class="bsk"></div></div>'
         '<div class="bsf m g">Оригінальні деталі та&#160;аналоги · John Deere, Bednar, Geringhoff, CLAAS та&#160;інші</div></div>'), s, 1)
-    for a, b in (('[03] Типи', '[04] Типи'), ('[02] Склад', '[03] Склад'), ('[01] Пошук', '[02] Пошук'), ('[05] Каталог', '[01] Каталог')):
+    for a, b in (('[03] Типи деталей', '[03] Категорії запчастин'), ('[05] Каталог', '[01] Каталог'),
+                 ('[06] Умови роботи', '[05] Умови роботи'), ('[07] Під замовлення', '[06] Під замовлення')):
         s = sub1(re.escape(a), b, s, 1)
+    if not is_mob:
+        s = reroll(s, 'Усі типи', 'Усі категорії', 1)
     s = sub1(r'(?=<section class="facts")', lambda _: services(is_mob), s, 1)
     it = iter(ICONS)
     s = sub1(r'<div class="fb">', lambda _: '<div class="fb">' + next(it), s, 4)
@@ -353,7 +400,13 @@ a.vlk:hover{color:var(--ink)}
 .hs.on .mk{animation:pop .5s cubic-bezier(.3,1.6,.5,1) forwards;animation-delay:calc(var(--d) + var(--t0) + var(--tw) + .9s)}
 .hs.on .tg{animation:wipe .7s cubic-bezier(.6,.05,.3,1) forwards;animation-delay:calc(var(--d) + var(--t0) + var(--tw) + .9s)}
 .v3h .lab .m{padding:2px 6px;background:var(--paper)}
-.v3h .boot{animation:fadeOut .6s 2.9s forwards}
+.v3h .boot{right:28px;bottom:24px;width:calc(36ch + 26px);padding:10px 12px;font-family:'Geist Mono',monospace;font-size:11px;background:var(--paper);border:1px solid var(--ink);animation:fadeOut .6s 2.9s forwards}
+.v3h .intro-t{left:28px;bottom:24px;width:340px;padding:0;border:1px solid var(--ink)}
+.v3h .intro-t .m{display:block;padding:7px 12px;background:var(--ink);color:var(--paper)}
+.v3h .intro-t b{padding:12px 12px 14px;font-size:32px}
+.mob .v3h .intro-t{left:8px;right:8px;top:auto;bottom:8px;width:auto}
+.mob .v3h .intro-t b{font-size:24px;padding:10px 12px 12px}
+.mob .v3h .boot{top:8px;right:8px;bottom:auto}
 .hps{position:absolute;left:28px;bottom:24px;z-index:5;display:grid;width:340px;animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) 3.6s backwards}
 .hp{grid-area:1/1;align-self:end;background:var(--paper);border:1px solid var(--ink);opacity:0;visibility:hidden;transform:translateY(8px);transition:opacity .3s,transform .45s cubic-bezier(.2,.7,.2,1),visibility 0s .45s}
 .hp.on{opacity:1;visibility:visible;transform:none;transition:opacity .35s .2s,transform .5s cubic-bezier(.2,.7,.2,1) .2s}
@@ -393,6 +446,26 @@ a.vlk:hover{color:var(--ink)}
 .mob .hstr::-webkit-scrollbar{display:none}
 .mob .hbc{flex:0 0 42%;scroll-snap-align:start;padding:8px 10px 10px}
 .mob .hbn b{font-size:16px}
+/* каталог: пошук і фільтр виробника по всьому каталогу */
+.csr{padding:18px 20px 16px;border-bottom:1px solid var(--line)}
+.csr .sbox input{height:64px;font-size:28px}
+.csr .ex{margin-top:12px}
+.cdyn{display:none}
+.cat.fx .cdyn{display:block}
+.cat.fx .pg4:not(.cgr),.cat.fx .pg2:not(.cgr),.cat.fx .pager,.cat.fx .morem{display:none}
+.cnf{display:none;padding:28px 20px;font-size:17px;line-height:1.55;color:var(--grey);border-bottom:1px solid var(--line)}
+.cnf.on{display:block}
+.cnf a{color:var(--ink);font-weight:600;white-space:nowrap}
+.cmr{display:flex;align-items:center;justify-content:space-between;gap:16px;height:56px;padding-left:20px;border-bottom:1px solid var(--line)}
+.cmr .btn-a{height:100%;min-width:240px;padding:0 20px}
+.cmr .btn-a[hidden]{display:none}
+.ph.np{display:flex;align-items:center;justify-content:center}
+.card .ph.np img{object-fit:contain;padding:22px;filter:none;mix-blend-mode:normal}
+.card:hover .ph.np img{transform:scale(1.05)}
+.mob .csr{padding:12px 16px 14px}
+.mob .cnf{padding:18px 16px;font-size:15px}
+.mob .cmr{height:52px;padding-left:16px}
+.mob .cmr .btn-a{min-width:0}
 /* технічні виноски */
 .an{position:absolute;z-index:4;display:flex;align-items:center;transform:translateY(-50%);clip-path:inset(0 100% 0 0);animation:wipe .7s cubic-bezier(.6,.05,.3,1) forwards;animation-delay:var(--d)}
 .an.lf{flex-direction:row-reverse;transform:translate(-100%,-50%);clip-path:inset(0 0 0 100%)}
@@ -623,6 +696,114 @@ JS = r"""
     }), { threshold: .25 }).observe(s);
   });
 
+  // каталог: номер або назва й вибір виробника фільтрують сітку по всьому каталогу
+  const PHOTO = new Set(PHOTO_IDS_JSON);
+  const RENDER = [[/підшипник/i, 'bearing'], [/шестерн/i, 'gear'], [/зірочк/i, 'sprocket']];
+  const escH = (x) => String(x).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const pad2 = (x) => (x < 10 ? '0' : '') + x;
+  function findAll(q) {
+    const qn = norm(q), ql = q.toLowerCase(), out = [];
+    for (const p of CAT) {
+      let score = 0, via = '', num = '';
+      const sn = norm(p.s);
+      if (qn && sn === qn) { score = 100; via = 'sku'; num = p.s; }
+      else if (qn && sn.startsWith(qn)) { score = 80; via = 'sku'; num = p.s; }
+      else {
+        for (const o of p.o) { const on = norm(o); if (on === qn) { score = 90; via = 'other'; num = o; break; } if (on.startsWith(qn) && score < 70) { score = 70; via = 'other'; num = o; } }
+        if (!score && qn.length >= 3 && sn.includes(qn)) { score = 60; via = 'sku'; num = p.s; }
+        if (!score && qn.length >= 3) { for (const o of p.o) { if (norm(o).includes(qn)) { score = 50; via = 'other'; num = o; break; } } }
+        if (!score && p.n.toLowerCase().includes(ql)) { score = 40; via = 'name'; num = p.s; }
+      }
+      if (score) out.push({ p, score, via, num });
+    }
+    return out.sort((a, b) => b.score - a.score || b.p.id - a.p.id);
+  }
+  document.querySelectorAll('.cat').forEach((sec) => {
+    const inp = sec.querySelector('input[data-q]'), tpl = sec.querySelector('.card');
+    if (!inp || !tpl) return;
+    const tplC = tpl.cloneNode(true);
+    const grid = sec.querySelector('.cgr'), nf = sec.querySelector('.cnf'), bar = sec.querySelector('.cmr');
+    const info = bar.querySelector('.m'), more = bar.querySelector('button'), cnt = sec.querySelector('.ccn');
+    const cnt0 = cnt.textContent;
+    const fl = Array.from(sec.querySelectorAll('.filt a'));
+    fl.forEach((a) => {
+      a.dataset.b = a.querySelector('.sr').textContent.replace(/\s*\[.*$/, '').trim().replace(/^Усі$/, '');
+      const c = a.querySelector(':scope > .m.g'); if (c) c.dataset.t = c.textContent;
+    });
+    const per = () => (matchMedia('(max-width: 899px)').matches ? 8 : 12);
+    let brand = '', list = [], shown = 0, raw = '';
+    const hl = (t) => {
+      const i = raw ? t.toUpperCase().indexOf(raw.toUpperCase()) : -1;
+      return i < 0 ? escH(t) : escH(t.slice(0, i)) + '<mark>' + escH(t.slice(i, i + raw.length)) + '</mark>' + escH(t.slice(i + raw.length));
+    };
+    function card(r, k) {
+      const p = r.p, el = tplC.cloneNode(true);
+      el.removeAttribute('data-rv'); el.removeAttribute('style');
+      const top = el.querySelectorAll('.top .m');
+      top[0].textContent = p.m; top[1].textContent = '[' + pad2(k + 1) + ']';
+      const ph = el.querySelector('.ph');
+      if (PHOTO.has(p.id)) ph.innerHTML = '<img src="assets/p' + p.id + '.webp" alt="' + escH(p.n + ' ' + p.s + ' ' + p.m) + '" loading="lazy">';
+      else {
+        const m = RENDER.find((x) => x[0].test(p.n));
+        ph.classList.add('np');
+        ph.innerHTML = m ? '<img src="assets/v2/t-' + m[1] + '.webp" alt="" loading="lazy">' : '<span class="m">Фото на&#160;запит</span>';
+      }
+      el.querySelector('.art').innerHTML = 'Арт. ' + (r.via === 'sku' ? hl(p.s) : escH(p.s));
+      el.querySelector('.nm').innerHTML = r.via === 'name' ? hl(p.n) : escH(p.n);
+      const old = el.querySelector('.oth'); if (old) old.remove();
+      if (p.o.length) {
+        const o = document.createElement('div');
+        o.className = 'oth m g';
+        o.innerHTML = 'Інші номери: ' + p.o.map((x) => (r.via === 'other' && x === r.num ? hl(x) : escH(x))).join(', ');
+        el.querySelector('.nm').after(o);
+      }
+      const price = PRICES[p.s];
+      el.querySelector('.pr').innerHTML = price
+        ? '<span class="prc">' + fmtN(price) + ' грн</span><span class="st"><i></i><span class="m g">В наявності</span></span>'
+        : '<span class="m g">Ціна за запитом</span>';
+      return el;
+    }
+    function page() {
+      const f = document.createDocumentFragment();
+      list.slice(shown, shown + per()).forEach((r, k) => f.appendChild(card(r, shown + k)));
+      grid.appendChild(f);
+      shown = Math.min(list.length, shown + per());
+      info.textContent = list.length ? 'Показано ' + shown + ' з ' + fmtN(list.length) : '';
+      more.hidden = shown >= list.length;
+      bar.hidden = !list.length;
+    }
+    function run() {
+      raw = inp.value.trim();
+      const q = raw.length >= 2;
+      sec.classList.toggle('fx', q || !!brand);
+      const res = q ? findAll(raw) : CAT.slice().sort((a, b) => b.id - a.id).map((p) => ({ p, via: '', num: '' }));
+      const bc = {};
+      res.forEach((r) => { bc[r.p.m] = (bc[r.p.m] || 0) + 1; });
+      fl.forEach((a) => {
+        const c = a.querySelector(':scope > .m.g');
+        if (c) c.textContent = q ? '[' + fmtN(a.dataset.b ? bc[a.dataset.b] || 0 : res.length) + ']' : c.dataset.t;
+      });
+      if (!q && !brand) { cnt.textContent = cnt0; return; }
+      list = brand ? res.filter((r) => r.p.m === brand) : res;
+      const n = list.length, w = plural(n, 'товар', 'товари', 'товарів');
+      cnt.textContent = (q ? 'Знайдено ' : '') + fmtN(n) + ' ' + w + (brand ? ' · ' + brand : '');
+      nf.classList.toggle('on', !n);
+      nf.innerHTML = n ? '' : 'Нічого не знайдено за «' + escH(raw) + '»' + (brand ? ' у ' + escH(brand) : '')
+        + '. Якщо потрібної деталі немає в&#160;каталозі, доставимо її під&#160;замовлення: <a href="tel:+380982430862">+38 (098) 243-08-62</a> або <a href="#order">залиште заявку</a>.';
+      grid.innerHTML = ''; shown = 0; page();
+    }
+    let tm = 0;
+    inp.addEventListener('input', () => { clearTimeout(tm); tm = setTimeout(run, 150); });
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { clearTimeout(tm); run(); } });
+    sec.querySelectorAll('[data-pick],[data-focusq]').forEach((b) => b.addEventListener('click', () => setTimeout(run, 0)));
+    fl.forEach((a) => a.addEventListener('click', () => {
+      brand = a.dataset.b;
+      fl.forEach((x) => x.classList.toggle('on', x === a));
+      run();
+    }));
+    more.addEventListener('click', page);
+  });
+
   // стрічка виробників: кількість товарів рахується з каталогу
   const cntB = {};
   CAT.forEach((p) => { cntB[p.m] = (cntB[p.m] || 0) + 1; });
@@ -667,6 +848,7 @@ JS = r"""
 </script>
 """
 
+JS = JS.replace('PHOTO_IDS_JSON', json.dumps(PHOTO_IDS))
 page = sub1(r'</style>', lambda _: CSS + '</style>', page, 1)
 page = sub1(r'</script>\s*</body>', lambda _: '</script>' + JS + '</body>', page, 1)
 page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · <a class="vlk" href="index.html">прототип v2, перша версія →</a>', page, 2)
