@@ -944,8 +944,10 @@ SVG_CSS = r"""
 /* підшипник у SVG */
 .sgb{aspect-ratio:960/660}
 .sgb>svg{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
-.sgb .ln{fill:none;stroke:#262826;stroke-width:1.6;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1}
-.sgb .ln.th{stroke-width:.9}
+.sgb .ln{fill:none;stroke:#262826;stroke-width:1.3;stroke-linejoin:round;stroke-linecap:round;stroke-dasharray:1;stroke-dashoffset:1}
+.sgb .ln.th{stroke-width:.8}
+.mob .sgb .ln{stroke-width:2}
+.mob .sgb .ln.th{stroke-width:1.2}
 .sgb .ca{position:absolute;inset:0;pointer-events:none;z-index:4}
 .sgb .ca .tg{pointer-events:auto}
 .sgb .ca .tg,.sgb .ca .an{width:max-content}
@@ -960,6 +962,8 @@ SVG_JS = r"""
   const NS = 'http://www.w3.org/2000/svg';
   const DEG = Math.PI / 180, CE = Math.cos(30 * DEG), SE = Math.sin(30 * DEG), K = 10;
   const TL = [236, 235, 230], TM = [207, 206, 200], TD = [156, 155, 150];
+  // сепаратор — штампована сталь, темніша за кільця й ролики, щоб читався окремою деталлю
+  const CAGE = [[214, 213, 207], [182, 181, 175], [136, 135, 130]];
   const LV = (() => { const v = [-0.369, -0.240, 0.898], n = Math.hypot(v[0], v[1], v[2]); return v.map((x) => x / n); })();
   const VV = [0, -CE, SE];
   const VB = { x: -480, y: -425, w: 960, h: 660 }, CY = VB.y + VB.h / 2, ZOOM = 1.35;
@@ -974,12 +978,13 @@ SVG_JS = r"""
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const mix = (a, b, k) => a.map((x, i) => x + (b[i] - x) * k);
   const hex = (c) => '#' + c.map((x) => Math.round(x).toString(16).padStart(2, '0')).join('');
-  function tone(v) {
-    if (v <= .10) return TD;
-    if (v < .15) return mix(TD, TM, (v - .10) / .05);
-    if (v <= .55) return TM;
-    if (v < .60) return mix(TM, TL, (v - .55) / .05);
-    return TL;
+  function tone(v, pal) {
+    const [L, M, D] = pal || [TL, TM, TD];
+    if (v <= .10) return D;
+    if (v < .15) return mix(D, M, (v - .10) / .05);
+    if (v <= .55) return M;
+    if (v < .60) return mix(M, L, (v - .55) / .05);
+    return L;
   }
 
   // геометрія, мм
@@ -1104,65 +1109,92 @@ SVG_JS = r"""
     arcLine(cone, 17.5, 16.2, bch, true); arcLine(cone, 17.5, .8, bore, true);
     for (const s of [-1, 1]) sil(cone, [P(s * 25.4, 0, 0), P(s * 26, 0, .6), P(s * 25.92, 0, 2.18), P(s * 23.5, 0, 1.58), P(s * 20.67, 0, 15.17), P(s * 21.95, 0, 15.45), P(s * 21.95, 0, 16.5), P(s * 21.45, 0, 17)]);
 
-    // сепаратор: 16 нерухомих секторів ободів, фланець і 16 перемичок, що обертаються; кожен — окремий шар для сортування
-    const cageSec = [];
+    // сепаратор: у кожного з 16 секторів верхній обід із фланцем і нижній обід — окремі шари (верх перед торцями роликів, низ за ними)
+    const cageSec = [], FL = [CG.s[0] - 2.8, CG.s[1] + .3];
     for (let k = 0; k < 16; k++) {
-      const a0 = k * PITCH, a1 = a0 + PITCH, am = a0 + PITCH / 2, g = el('g', {}, scn);
-      for (const [p0, p1] of [[CG.s, CG.w0], [CG.w1, CG.e]]) {
+      const a0 = k * PITCH, a1 = a0 + PITCH, am = a0 + PITCH / 2;
+      [[CG.s, CG.w0, true], [CG.w1, CG.e, false]].forEach(([p0, p1, top]) => {
+        const g = el('g', {}, scn);
         const [nr, nz] = revNormal(p0[0], p0[1], p1[0], p1[1], 1);
-        const nOut = [nr * Math.cos(am), nr * Math.sin(am), nz], face = dot(nOut, VV) > 0 ? 1 : -1;
-        const c = hex(tone(dot(nOut.map((x) => x * face), LV)));
-        fill(g, poly(arc(p0[0], p0[1], a0, a1, 6).concat(arc(p1[0], p1[1], a1, a0, 6)), true), c);
+        const nAt = (a) => [nr * Math.cos(a), nr * Math.sin(a), nz];
+        const face = dot(nAt(am), VV) > 0 ? 1 : -1, rm = (p0[0] + p1[0]) / 2, zm = (p0[1] + p1[1]) / 2;
+        // тон плавно змінюється вздовж сектора — без сходинок між сусідніми секторами
+        const A = P(rm * Math.cos(a0), rm * Math.sin(a0), zm), B = P(rm * Math.cos(a1), rm * Math.sin(a1), zm);
+        const gr = el('linearGradient', { id: 'brs-' + id + '-' + (gid++), gradientUnits: 'userSpaceOnUse', x1: f1(A[0]), y1: f1(A[1]), x2: f1(B[0]), y2: f1(B[1]) }, defs);
+        const L2c = (B[0] - A[0]) ** 2 + (B[1] - A[1]) ** 2 || 1;
+        for (let j = 0; j <= 6; j++) {
+          const aj = a0 + (a1 - a0) * j / 6, Q = P(rm * Math.cos(aj), rm * Math.sin(aj), zm);
+          const o = Math.min(1, Math.max(0, ((Q[0] - A[0]) * (B[0] - A[0]) + (Q[1] - A[1]) * (B[1] - A[1])) / L2c));
+          el('stop', { offset: o.toFixed(4), 'stop-color': hex(tone(dot(nAt(aj).map((x) => x * face), LV), CAGE)) }, gr);
+        }
+        // внутрішній бік верхнього обода ззаду закритий фланцем — його не малюємо
+        const band = !(top && face < 0);
+        if (band) fill(g, poly(arc(p0[0], p0[1], a0, a1, 6).concat(arc(p1[0], p1[1], a1, a0, 6)), true), 'url(#' + gr.id + ')', { stroke: 'url(#' + gr.id + ')' });
         line(g, poly(arc(p0[0], p0[1], a0, a1, 6)), true);
-        line(g, poly(arc(p1[0], p1[1], a0, a1, 6)), true);
-      }
-      cageSec.push({ g, d: depth(24 * Math.cos(am), 24 * Math.sin(am), 9) });
+        if (band) line(g, poly(arc(p1[0], p1[1], a0, a1, 6)), true);
+        if (top) {
+          fill(g, poly(arc(FL[0], FL[1], a0, a1, 6).concat(arc(CG.s[0], CG.s[1], a1, a0, 6)), true), hex(CAGE[0]));
+          line(g, poly(arc(FL[0], FL[1], a0, a1, 6)), true);
+        }
+        // верхній обід із фланцем лежить над внутрішнім кільцем і над торцями роликів — завжди перед ними, під зовнішнім кільцем
+        const r = (p0[0] + p1[0]) / 2, z = (p0[1] + p1[1]) / 2;
+        cageSec.push({ g, d: top ? -36 + k * 1e-3 : depth(r * Math.cos(am), r * Math.sin(am), z), zhi: top ? FL[1] : p0[1] });
+      });
     }
-    const flange = el('g', {}, scn);
-    fill(flange, ring(CG.s[0], CG.s[1]) + ring(CG.s[0] - 2.8, CG.s[1] + .3), hex(TL), { 'fill-rule': 'evenodd' });
-    line(flange, ring(CG.s[0] - 2.8, CG.s[1] + .3), true); line(flange, ring(CG.s[0], CG.s[1]), true);
     const bridges = [];
     for (let i = 0; i < 16; i++) { const g = el('g', {}, scn); bridges.push({ g, f: fill(g, '', hex(TM)), l: line(g, '', true) }); }
 
-    // ролики: конічні, вісь нахилена на 14°, грані з тоном за нормаллю, малий торець з фаскою
+    // ролики: конічні, вісь нахилена на 14°; бічна поверхня — градієнт тону поперек ролика, торець із фаскою
     const rolls = [];
     for (let i = 0; i < 16; i++) {
-      const g = el('g', {}, scn), faces = [];
-      for (let j = 0; j < 16; j++) faces.push(fill(g, '', hex(TM)));
+      const g = el('g', {}, scn);
+      const gr = el('linearGradient', { id: 'brr-' + id + '-' + i, gradientUnits: 'userSpaceOnUse' }, defs);
+      const stops = [];
+      for (let j = 0; j < RS; j++) stops.push(el('stop', {}, gr));
+      const side = fill(g, '', 'url(#' + gr.id + ')', { stroke: 'url(#' + gr.id + ')' });
       const chf = fill(g, '', hex(TL)), cap = fill(g, '', hex(TL));
-      rolls.push({ g, faces, cap, chf, out: line(g, ''), capl: line(g, '', true), chl: line(g, '') });
+      rolls.push({ g, gr, stops, side, cap, chf, out: line(g, ''), capl: line(g, '', true), chl: line(g, '') });
     }
-    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, cageSec, flange, bridges, rolls, vis, order: [] };
+    return { box, svg, scn, crect, lines, fills, cupB, cupF, cone, cageSec, bridges, rolls, vis, order: [] };
   }
 
+  const RS = 14;
   function rollerGeo(phi, k) {
     const er = [Math.cos(phi), Math.sin(phi), 0];
     const uw = [Math.sin(TH) * er[0], Math.sin(TH) * er[1], -Math.cos(TH)];
     const m = Math.hypot(uw[1], uw[0]), e1 = [uw[1] / m, -uw[0] / m, 0];
     const e2 = [uw[1] * e1[2] - uw[2] * e1[1], uw[2] * e1[0] - uw[0] * e1[2], uw[0] * e1[1] - uw[1] * e1[0]];
     const od = [Math.cos(TH) * er[0] * k, Math.cos(TH) * er[1] * k, Math.sin(TH) * k];
-    const N = 16;
-    const circ = (L, rho) => {
-      const c = [L * uw[0] + od[0], L * uw[1] + od[1], zA + L * uw[2] + od[2]], pts = [];
-      for (let j = 0; j < N; j++) {
-        const t = 2 * Math.PI * j / N, n = [Math.cos(t) * e1[0] + Math.sin(t) * e2[0], Math.cos(t) * e1[1] + Math.sin(t) * e2[1], Math.cos(t) * e1[2] + Math.sin(t) * e2[2]];
-        pts.push({ p: P(c[0] + rho * n[0], c[1] + rho * n[1], c[2] + rho * n[2]), n });
-      }
-      return { c, pts };
-    };
+    const N = 36;
+    const nrm = (t) => [Math.cos(t) * e1[0] + Math.sin(t) * e2[0], Math.cos(t) * e1[1] + Math.sin(t) * e2[1], Math.cos(t) * e1[2] + Math.sin(t) * e2[2]];
+    const ctr = (L) => [L * uw[0] + od[0], L * uw[1] + od[1], zA + L * uw[2] + od[2]];
+    const at = (c, rho, n) => P(c[0] + rho * n[0], c[1] + rho * n[1], c[2] + rho * n[2]);
+    const circ = (L, rho) => { const c = ctr(L), pts = []; for (let j = 0; j < N; j++) pts.push(at(c, rho, nrm(2 * Math.PI * j / N))); return { c, pts }; };
     const a = circ(L1 + CH, R1), b = circ(L2 - CH, R2), cap = circ(L1, R1 - CH);
-    const faces = [];
-    for (let j = 0; j < N; j++) {
-      const j2 = (j + 1) % N, n = a.pts[j].n.map((x, q) => (x + a.pts[j2].n[q]) / 2);
-      if (dot(n, VV) <= 0) { faces.push(null); continue; }
-      faces.push({ d: poly([a.pts[j].p, a.pts[j2].p, b.pts[j2].p, b.pts[j].p], true), c: hex(tone(dot(n, LV))) });
+    // градієнт: від одного видимого краю ролика до іншого, тон за нормаллю (та сама toon-шкала)
+    const cm = ctr(Lm), Rm = Lm * tanT, pm = P(cm[0], cm[1], cm[2]), pa = P(a.c[0], a.c[1], a.c[2]), pb = P(b.c[0], b.c[1], b.c[2]);
+    let ux = -(pb[1] - pa[1]), uy = pb[0] - pa[0]; const ul = Math.hypot(ux, uy) || 1; ux /= ul; uy /= ul;
+    const smp = [];
+    for (let j = 0; j < 72; j++) {
+      const n = nrm(2 * Math.PI * j / 72);
+      if (dot(n, VV) < 0) continue;
+      const q = at(cm, Rm, n);
+      smp.push([(q[0] - pm[0]) * ux + (q[1] - pm[1]) * uy, dot(n, LV)]);
+    }
+    smp.sort((x, y) => x[0] - y[0]);
+    const s0 = smp[0][0], s1 = smp[smp.length - 1][0], stops = [];
+    for (let j = 0; j < RS; j++) {
+      const sv = s0 + (s1 - s0) * j / (RS - 1);
+      let best = smp[0];
+      for (const x of smp) if (Math.abs(x[0] - sv) < Math.abs(best[0] - sv)) best = x;
+      stops.push([j / (RS - 1), hex(tone(best[1]))]);
     }
     const capN = uw.map((x) => -x);
-    const chN = capN.map((x, q) => x * .7);
-    const mid = [(a.c[0] + b.c[0]) / 2, (a.c[1] + b.c[1]) / 2, (a.c[2] + b.c[2]) / 2];
     return {
-      faces, out: hull(a.pts.concat(b.pts, cap.pts).map((x) => x.p)), cap: cap.pts.map((x) => x.p), rim: a.pts.map((x) => x.p),
-      capTone: hex(tone(dot(capN, LV))), chTone: hex(tone(dot(chN, LV) + .1)), capC: cap.c, mid,
+      g1: [pm[0] + ux * s0, pm[1] + uy * s0], g2: [pm[0] + ux * s1, pm[1] + uy * s1], stops,
+      out: hull(a.pts.concat(b.pts, cap.pts)), cap: cap.pts, rim: a.pts,
+      capTone: hex(tone(dot(capN, LV))), chTone: hex(tone(dot(capN.map((x) => x * .7), LV) + .1)), capC: cap.c,
+      mid: [(a.c[0] + b.c[0]) / 2, (a.c[1] + b.c[1]) / 2, (a.c[2] + b.c[2]) / 2],
     };
   }
 
@@ -1188,7 +1220,7 @@ SVG_JS = r"""
     const [nr, nz] = [Math.cos(THC), Math.sin(THC)].map((x) => x * face);
     const am = (a0 + a1) / 2, n = [nr * Math.cos(am), nr * Math.sin(am), nz];
     if (dot(n, VV) <= 0) return null;
-    return { d: poly(arc(CG.w0[0], CG.w0[1], a0, a1, 3).concat(arc(CG.w1[0], CG.w1[1], a1, a0, 3)), true), c: hex(tone(dot(n, LV))),
+    return { d: poly(arc(CG.w0[0], CG.w0[1], a0, a1, 3).concat(arc(CG.w1[0], CG.w1[1], a1, a0, 3)), true), c: hex(tone(dot(n, LV), CAGE)),
       l: poly([P(CG.w0[0] * Math.cos(a0), CG.w0[0] * Math.sin(a0), CG.w0[1]), P(CG.w1[0] * Math.cos(a0), CG.w1[0] * Math.sin(a0), CG.w1[1])]) +
          poly([P(CG.w0[0] * Math.cos(a1), CG.w0[0] * Math.sin(a1), CG.w0[1]), P(CG.w1[0] * Math.cos(a1), CG.w1[0] * Math.sin(a1), CG.w1[1])]) };
   }
@@ -1204,15 +1236,14 @@ SVG_JS = r"""
     S.vis.lo[0].setAttribute('d', poly(clipConvex(eTop, loop(33.1, c0)), true)); S.vis.lo[1].setAttribute('d', outside);
     const vid = S.box.dataset.id;
     const occl = (g, zhi) => { const u = 'url(#brc' + (zhi <= c0 ? 'lo' : 'in') + '-' + vid + ')'; if (g.getAttribute('clip-path') !== u) g.setAttribute('clip-path', u); };
-    occl(S.cone, 17 + q.cone); occl(S.flange, CG.s[1] + .3);
-    S.cageSec.forEach((x) => occl(x.g, CG.s[1] + .3));
+    occl(S.cone, 17 + q.cone);
+    S.cageSec.forEach((x) => occl(x.g, x.zhi));
     S.bridges.forEach((x) => occl(x.g, CG.w0[1]));
     const coneD = depth(0, 0, 17 + q.cone);
     const items = [
       { g: S.cupB, d: depth(0, 32.4, 3.8 + q.cup) },
       { g: S.cupF, d: depth(0, -36, 10.75 + q.cup) },
       { g: S.cone, d: coneD },
-      { g: S.flange, d: coneD - .1 },
     ].concat(S.cageSec);
     // перемички сепаратора
     S.bridges.forEach((b, i) => {
@@ -1226,7 +1257,9 @@ SVG_JS = r"""
     S.rolls.forEach((r, i) => {
       const g = rollerGeo(2 * Math.PI * i / 16 + q.spin, q.roll);
       S.geo.push(g);
-      g.faces.forEach((f, j) => { const e = r.faces[j]; e.setAttribute('d', f ? f.d : ''); if (f) { e.setAttribute('fill', f.c); e.setAttribute('stroke', f.c); } });
+      r.gr.setAttribute('x1', f1(g.g1[0])); r.gr.setAttribute('y1', f1(g.g1[1])); r.gr.setAttribute('x2', f1(g.g2[0])); r.gr.setAttribute('y2', f1(g.g2[1]));
+      g.stops.forEach(([o, c], j) => { r.stops[j].setAttribute('offset', o.toFixed(3)); r.stops[j].setAttribute('stop-color', c); });
+      r.side.setAttribute('d', poly(g.out, true));
       r.chf.setAttribute('d', poly(g.rim, true)); r.chf.setAttribute('fill', g.chTone); r.chf.setAttribute('stroke', g.chTone);
       r.cap.setAttribute('d', poly(g.cap, true)); r.cap.setAttribute('fill', g.capTone); r.cap.setAttribute('stroke', g.capTone);
       r.out.setAttribute('d', poly(g.out, true));
