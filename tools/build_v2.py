@@ -259,9 +259,9 @@ def hero(mob, boot, intro_t):
                       f'<div class="hpb"><b>{s["b"]}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")} у&#160;каталозі</span>'
                       f'<span class="hpc m g">{alt}</span></div>'
                       f'<a href="#" class="hpl hv"><span class="tbg" aria-hidden="true"></span><span class="m">{roll("Запчастини " + s["b"])}</span>{ARROW}</a></div>')
-        cells.append(f'<button type="button" class="hbc hv{on}"><span class="tbg" aria-hidden="true"></span><i class="hbp"></i>'
+        cells.append(f'<button type="button" class="hbc hvt{on}"><i class="hbp"></i>'
                      f'<span class="hbt"><img src="assets/v2/bp-{k}-320.webp" alt="" loading="lazy" decoding="async"></span>'
-                     f'<span class="hbn"><b>{roll(s["b"])}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")}</span></span></button>')
+                     f'<span class="hbn"><b class="rt">{roll(s["b"])}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")}</span></span></button>')
     if mob:
         labs = '<div class="lab" style="left: 14px; top: 14px; --d: 3.2s;"><span class="m">[00] Каталог · v2</span></div>'
     else:
@@ -426,6 +426,7 @@ a.vlk:hover{color:var(--ink)}
 /* герой: слайди виробників «ч/б → колір», рядок виробників унизу */
 .v3h{--hh:clamp(460px,40vw,580px);height:auto;overflow:visible;background-image:none}
 .mob .v3h{--hh:400px;height:auto}
+.dsk .intro{grid-template-columns:minmax(0,4fr) minmax(0,2fr) minmax(0,1fr)}
 .hvw{position:relative;height:var(--hh);overflow:hidden}
 .hsl{position:absolute;inset:0;overflow:hidden;z-index:0}
 .hs{position:absolute;inset:0;visibility:hidden;--t0:0s;--tw:.9s}
@@ -481,6 +482,7 @@ a.vlk:hover{color:var(--ink)}
 .hstr{position:relative;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line)}
 .hbc{position:relative;display:flex;flex-direction:column;gap:9px;min-width:0;padding:10px 12px 12px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background .25s}
 .hbc:first-child{border-left:0}
+.hbc:hover{background:var(--p2)}
 .hbt{display:block;aspect-ratio:2.4/1;overflow:hidden;background:var(--p2)}
 .hbt img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.12) brightness(1.04);transition:filter .45s,transform .6s cubic-bezier(.2,.7,.2,1)}
 .hbc.on .hbt img,.hbc:hover .hbt img{filter:none}
