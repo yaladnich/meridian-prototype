@@ -2,7 +2,8 @@
 
 python tools/shoot.py URL W H plan.json [тека]
 
-plan.json — список кроків [js, пауза_с, імʼя]: js виконується на сторінці (null — нічого), потім пауза,
+plan.json — список кроків [js, пауза_с, імʼя]: js виконується на сторінці (null — нічого; «HOVER:селектор» —
+прокрутити до елемента й навести на його центр мишку), потім пауза,
 потім знімок imʼя.jpg (null — без знімка). Значення, яке повертає js, друкується.
 Ширина < 900 вмикає мобільну емуляцію (дотик). Тека за замовчуванням — shots/ у корені репозиторію.
 
@@ -59,7 +60,14 @@ async def main(url, w, h, plan, out):
                 await cmd('Emulation.setTouchEmulationEnabled', enabled=True, maxTouchPoints=5)
             await cmd('Page.navigate', url=url)
             for js, wait, name in plan:
-                if js:
+                if js and js.startswith('HOVER:'):
+                    sel = json.dumps(js[6:])
+                    r = await cmd('Runtime.evaluate', returnByValue=True, expression=(
+                        f'(()=>{{const e=document.querySelector({sel});e.scrollIntoView({{block:"center"}});'
+                        f'const b=e.getBoundingClientRect();return [b.left+b.width/2,b.top+b.height/2]}})()'))
+                    x, y = r['result']['value']
+                    await cmd('Input.dispatchMouseEvent', type='mouseMoved', x=x, y=y)
+                elif js:
                     r = await cmd('Runtime.evaluate', expression=js, returnByValue=True, awaitPromise=True)
                     val = r.get('result', {}).get('value') if isinstance(r, dict) else r
                     if val is not None:

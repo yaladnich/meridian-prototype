@@ -133,7 +133,36 @@ def icon_nut():
     return iso_svg(vis, hid, p((a[0] + b[0]) / 2, (a[1] + b[1]) / 2, H / 2))
 
 
-ICONS = [icon_ring(), icon_box(), icon_sheets(), icon_nut()]
+def icon_wrench():
+    """Розвідний ключ, що лежить на площині: контур зверху, товщина пунктиром знизу, отвір у ручці, черв'як і губки."""
+    import math
+    T, ox, oy, k = 7, 52, 42, .95
+    p = lambda u, v, z=0: P(u * k, v * k, z, ox, oy)
+
+    def arc(cx, cy, r, a0, a1, n=24):
+        return [(cx + r * math.cos(math.radians(a0 + (a1 - a0) * i / n)), cy + r * math.sin(math.radians(a0 + (a1 - a0) * i / n))) for i in range(n + 1)]
+
+    hx, hr, jaw, w = 112, 27, 8, 9
+    ay = math.degrees(math.asin(jaw / hr))
+    ax = math.degrees(math.acos(-w / hr))
+    outline = ([(0, -w), (hx - math.sqrt(hr * hr - w * w), -w)]
+               + arc(hx, 0, hr, -ax, -ay)
+               + [(hx + 6, -jaw), (hx + 6, jaw)]
+               + arc(hx, 0, hr, ay, ax)
+               + [(0, w)]
+               + arc(0, 0, w, 90, 270))
+    top = pl([p(u, v, T) for u, v in outline], True)
+    bottom = pl([p(u, v, 0) for u, v in outline], True)
+    slot = pl([p(u, v, T) for u, v in [(12, -3.5), (38, -3.5)] + arc(38, 0, 3.5, -90, 90, 8) + [(12, 3.5)] + arc(12, 0, 3.5, 90, 270, 8)], True)
+    worm = [pl([p(u, -6, T), p(u, 6, T)]) for u in (93, 97, 101)]
+    sx = lambda uv: (uv[0] - uv[1])
+    sy = lambda uv: (uv[0] + uv[1])
+    sil = {min(outline, key=sx), max(outline, key=sx), max(outline, key=sy)}
+    edges = [pl([p(u, v, 0), p(u, v, T)]) for u, v in sil]
+    return iso_svg([top, slot] + worm + edges, [bottom], p(hx + 6, 0, T))
+
+
+ICONS = [icon_ring(), icon_box(), icon_sheets(), icon_wrench()]
 
 # ---------- дані каталогу ----------
 M = json.loads(re.search(r'const M=(\[.*?\]);', src).group(1))
@@ -230,9 +259,9 @@ def hero(mob, boot, intro_t):
                       f'<div class="hpb"><b>{s["b"]}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")} у&#160;каталозі</span>'
                       f'<span class="hpc m g">{alt}</span></div>'
                       f'<a href="#" class="hpl hv"><span class="tbg" aria-hidden="true"></span><span class="m">{roll("Запчастини " + s["b"])}</span>{ARROW}</a></div>')
-        cells.append(f'<button type="button" class="hbc{on}"><i class="hbp"></i>'
+        cells.append(f'<button type="button" class="hbc hv{on}"><span class="tbg" aria-hidden="true"></span><i class="hbp"></i>'
                      f'<span class="hbt"><img src="assets/v2/bp-{k}-320.webp" alt="" loading="lazy" decoding="async"></span>'
-                     f'<span class="hbn"><b>{s["b"]}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")}</span></span></button>')
+                     f'<span class="hbn"><b>{roll(s["b"])}</b><span class="m g">{fmt(c)} {plural(c, "товар", "товари", "товарів")}</span></span></button>')
     if mob:
         labs = '<div class="lab" style="left: 14px; top: 14px; --d: 3.2s;"><span class="m">[00] Каталог · v2</span></div>'
     else:
@@ -357,7 +386,7 @@ def part(s, is_mob):
     grid = 'pg2' if is_mob else 'pg4'
     dyn = (f'<div class="cdyn"><div class="{grid} cgr"></div><div class="cnf"></div>'
            '<div class="cmr"><span class="m g"></span><button type="button" class="btn-a hv inv"><span class="tbg" aria-hidden="true"></span>'
-           f'<span class="m">Показати ще</span>{ARROW}</button></div></div>')
+           f'<span class="m">{roll("Показати ще")}</span>{ARROW}</button></div></div>')
     anchor = '<a href="#" class="morem' if is_mob else '<div class="pager"'
     i = cat.index(anchor)
     cat = cat[:i] + dyn + cat[i:]
@@ -440,6 +469,11 @@ a.vlk:hover{color:var(--ink)}
 .hpc{font-size:10.5px}
 .hpl{display:flex;align-items:center;justify-content:space-between;height:42px;padding:0 12px;border-top:1px solid var(--ink)}
 .hpl .ico{transition:transform .3s}.hpl:hover .ico{transform:translateX(4px)}
+.hp{cursor:pointer}
+.hp:hover .hpl{color:var(--ai)}
+.hp:hover .hpl>.tbg{transform:none}
+.hp:hover .hpl .ch>span{transform:translateY(-100%)}
+.hp:hover .hpl .ico{transform:translateX(4px)}
 @media (max-width:1240px){.hps{width:300px}.hpb b{font-size:30px}}
 .hct{position:absolute;right:28px;bottom:18px;z-index:5;display:flex;align-items:center;gap:6px;animation:fadeUp .8s cubic-bezier(.2,.7,.2,1) 3.7s backwards}
 .hnum{margin-right:4px;padding:3px 6px;background:var(--paper)}
@@ -447,7 +481,6 @@ a.vlk:hover{color:var(--ink)}
 .hstr{position:relative;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));border-top:1px solid var(--line)}
 .hbc{position:relative;display:flex;flex-direction:column;gap:9px;min-width:0;padding:10px 12px 12px;border:0;border-left:1px solid var(--line);background:transparent;color:var(--ink);text-align:left;cursor:pointer;transition:background .25s}
 .hbc:first-child{border-left:0}
-.hbc:hover{background:var(--p2)}
 .hbt{display:block;aspect-ratio:2.4/1;overflow:hidden;background:var(--p2)}
 .hbt img{display:block;width:100%;height:100%;object-fit:cover;filter:grayscale(1) contrast(1.12) brightness(1.04);transition:filter .45s,transform .6s cubic-bezier(.2,.7,.2,1)}
 .hbc.on .hbt img,.hbc:hover .hbt img{filter:none}
@@ -455,7 +488,7 @@ a.vlk:hover{color:var(--ink)}
 .hbn{display:flex;flex-direction:column;gap:3px;min-width:0}
 .hbn b{font-size:clamp(14px,1.35vw,20px);font-weight:700;letter-spacing:-.03em;text-transform:uppercase;line-height:1.15;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .hbn .m{font-size:11px}
-.hbp{position:absolute;left:0;right:0;top:-1px;height:3px;background:var(--acc);transform-origin:left;transform:scaleX(0);z-index:1}
+.hbp{position:absolute;left:0;right:0;top:0;height:3px;background:var(--acc);transform-origin:left;transform:scaleX(0);z-index:1}
 .hbc.on .hbp.run{animation:hsG var(--sd,7000ms) linear forwards}
 .v3h.ps .hbp{animation-play-state:paused}
 .mob .hs .bpn{left:14px}
@@ -564,6 +597,22 @@ a.vlk:hover{color:var(--ink)}
 .mob .scl.h{top:47%;left:14px;right:14px}
 .mob .scl.v{top:14px;bottom:14px}
 .mob .ord .xy{display:none}
+/* іконки месенджерів у футері — плавно, як у шапці */
+.ft4 a.ms,.ftm a.ms{transition:color .25s,transform .25s}
+.ft4 a.ms:hover,.ftm a.ms:hover{opacity:1}
+/* «Умови роботи» як картки: іконка оживає, посилання отримує ховер */
+.facts .fc{cursor:pointer;transition:background .3s}
+.facts .fc:hover{background:#ECEBE5}
+.facts .fc .iso{transition:transform .5s cubic-bezier(.2,.7,.2,1)}
+.facts .fc:hover .iso{transform:translateY(-6px)}
+.facts.in .fc:hover .iso .hd{stroke:var(--ink);animation:isoAnts 1s linear infinite}
+@keyframes isoAnts{to{stroke-dashoffset:-12}}
+.facts.in .fc .iso .ia{transition:transform .35s cubic-bezier(.3,1.6,.5,1)}
+.facts.in .fc:hover .iso .ia{transform:scale(1.7)}
+.facts .fc:hover .fln{color:var(--ai)}
+.facts .fc:hover .fln>.tbg{transform:none}
+.facts .fc:hover .fln .ch>span{transform:translateY(-100%)}
+.facts .fc:hover .fln .ico{transform:translateX(3px)}
 /* ізометричні іконки */
 .iso{display:block;width:190px;height:auto;margin:-10px 0 2px -12px;overflow:visible}
 .iso .dr{stroke-width:1.2}
@@ -847,6 +896,13 @@ JS = r"""
     show(); next();
   });
 
+  // картки «Умов роботи» й картка бренду в героях: клік по картці — як по її посиланню
+  document.querySelectorAll('.facts .fc, .v3h .hp').forEach((c) => c.addEventListener('click', (e) => {
+    if (e.target.closest('a')) return;
+    const a = c.querySelector('.fln, .hpl');
+    if (a) a.click();
+  }));
+
   // блок замовлення: координати кутів і приціл за курсором
   document.querySelectorAll('.ord').forEach((o) => {
     const set = () => {
@@ -880,6 +936,9 @@ page = sub1(r'\. Wikimedia Commons, CC BY-SA 3\.0 / 4\.0</div>', lambda _: (
     '<a href="https://commons.wikimedia.org/wiki/File:BEDNAR_logo_2019_RGB.jpg" target="_blank" rel="noopener">Cz-bd-1</a>, '
     '<a href="https://commons.wikimedia.org/wiki/File:OLIMAC_LOGO.png" target="_blank" rel="noopener">Agromacintosh</a>, '
     'Wikimedia Commons, CC BY-SA 4.0. Логотипи виробників — торгові марки їхніх власників.</div>'), page, 2)
+n_order = page.count('<span class="m">Замовити</span>')
+assert n_order >= 16, n_order
+page = page.replace('<span class="m">Замовити</span>', '<span class="m">' + roll('Замовити') + '</span>')
 page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · <a class="vlk" href="v1.html">перша версія прототипу →</a>', page, 2)
 
 (ROOT / 'index.html').write_text(page, encoding='utf-8')
