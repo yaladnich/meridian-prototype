@@ -5,6 +5,7 @@ python tools/v2_assets.py brands     # лише фото брендів
 """
 import io
 import json
+import re
 import subprocess
 import sys
 from pathlib import Path
@@ -19,8 +20,9 @@ OUT.mkdir(parents=True, exist_ok=True)
 
 BRANDS = ['jd', 'claas', 'bednar', 'geringhoff', 'olimac', 'kuhn', 'amazone']
 TILES = ['gear', 'bearing', 'sprocket']
-LOGOS_LUM = {'vaderstad', 'bednar'}
-LOGOS = ['claas', 'geringhoff', 'horsch', 'kuhn', 'kverneland', 'amazone', 'parker', 'vaderstad', 'bednar', 'olimac', 'optibelt', 'schumacher']
+LOGOS_LUM = {'vaderstad', 'bednar', 'johndeere', 'ai'}
+LOGO_TINT = {'gates': (191, 32, 38)}
+LOGOS = ['johndeere', 'gates', 'ai', 'claas', 'geringhoff', 'horsch', 'kuhn', 'kverneland', 'amazone', 'parker', 'vaderstad', 'bednar', 'olimac', 'optibelt', 'schumacher']
 
 
 def lum(a):
@@ -57,15 +59,20 @@ def logos():
     for k in LOGOS:
         src = next((ROOT / 'assets' / 'logos' / 'src').glob(f'{k}.*'))
         if src.suffix == '.svg':
-            im = Image.open(io.BytesIO(cairosvg.svg2png(url=str(src), output_width=1400))).convert('RGBA')
+            svg = src.read_text(encoding='utf-8')
+            if k == 'johndeere':
+                # у файлі дві версії (зелена й чорна), показ через :target — лишаємо зелену
+                svg = re.sub(r'<style>.*?</style>', '', svg, flags=re.S)
+                svg = svg[:svg.index('<g id="black"')] + '</svg>'
+            im = Image.open(io.BytesIO(cairosvg.svg2png(bytestring=svg.encode('utf-8'), output_width=1400))).convert('RGBA')
         else:
             im = Image.open(src).convert('RGBA')
         a = np.asarray(im).astype(np.float32) / 255
         mn = a[..., :3].min(axis=2)
         white = np.clip((mn - .72) / .21, 0, 1)
         keep = a[..., 3] * (1 - white * white * (3 - 2 * white))
-        # світлий напис на темній плашці або темний на жовтій: одноколірна версія за яскравістю
-        ink = a[..., 3] * np.clip((.72 - lum(a[..., :3])) / .45, 0, 1) if k in LOGOS_LUM else keep
+        # світле (жовте, світло-зелене) на темному чи навпаки: одноколірна версія за яскравістю
+        ink = a[..., 3] * np.clip((.62 - lum(a[..., :3])) / .14, 0, 1) if k in LOGOS_LUM else keep
         ys, xs = np.where(keep > .04)
         y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
         ink, keep, rgb = ink[y0:y1, x0:x1], keep[y0:y1, x0:x1], a[y0:y1, x0:x1, :3]
@@ -73,6 +80,8 @@ def logos():
         w = round((x1 - x0) * h / (y1 - y0))
         mono = np.zeros((y1 - y0, x1 - x0, 4), np.float32)
         mono[..., 0], mono[..., 1], mono[..., 2], mono[..., 3] = .149, .157, .149, ink
+        if k in LOGO_TINT:
+            rgb = np.ones_like(rgb) * np.array(LOGO_TINT[k]) / 255
         col = np.dstack([rgb, keep])
         for arr, suf in ((mono, ''), (col, '-c')):
             out = Image.fromarray((arr * 255 + .5).astype(np.uint8), 'RGBA').resize((w, h), Image.LANCZOS)

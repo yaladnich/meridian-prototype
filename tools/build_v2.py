@@ -187,7 +187,7 @@ def fmt(n):
 
 # ---------- рядок логотипів виробників ----------
 LOGO_META = json.loads((ROOT / 'assets' / 'v2' / 'logos.json').read_text(encoding='utf-8'))
-LOGO_KEY = {'CLAAS': 'claas', 'Geringhoff': 'geringhoff', 'Horsch': 'horsch', 'Kuhn': 'kuhn', 'Kverneland': 'kverneland',
+LOGO_KEY = {'John Deere': 'johndeere', 'Gates': 'gates', 'A&I': 'ai', 'CLAAS': 'claas', 'Geringhoff': 'geringhoff', 'Horsch': 'horsch', 'Kuhn': 'kuhn', 'Kverneland': 'kverneland',
             'AMAZONE': 'amazone', 'Parker': 'parker', 'Vaderstad': 'vaderstad', 'Bednar': 'bednar', 'OLIMAC': 'olimac',
             'Optibelt': 'optibelt', 'Schumacher': 'schumacher'}
 LOGO_NAME = {'Vaderstad': 'Väderstad'}

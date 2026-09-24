@@ -108,8 +108,10 @@ v2 — основа майбутнього редизайну живого са�
    при наведенні — кольорові; висота за візуальною площею (≈3600 px², ≤ 40 px заввишки, ≤ 170 px завширшки).
    Логотипи: CLAAS, Geringhoff, Horsch, Kuhn, Kverneland, AMAZONE, Parker, Väderstad — Wikimedia Commons (суспільне
    надбання); BEDNAR (Cz-bd-1) і OLIMAC (Agromacintosh) — Commons, CC BY-SA 4.0, автори у футері («Автори фото»);
-   Optibelt — сайт optibelt.com (CDN storyblok), Schumacher — groupschumacher.com. John Deere, Gates, A&I, AGV —
-   назвою (файлів у відкритому доступі не знайшлося). Вихідники — `assets/logos/src/`.
+   Optibelt — сайт optibelt.com (CDN storyblok), Schumacher — groupschumacher.com, John Deere — cdn-ux.deere.com
+   (з файлу взято зелену версію), Gates — gates.com (чорна версія; сайт блокує прямі запити, файл узято через браузер;
+   кольорова для наведення перефарбована у фірмовий #BF2026 із сайту), A&I Products — aiproducts.com (PNG 166×65, трохи
+   м'який). AGV — назвою: це власна лінія Bepco, окремого файлу логотипа немає. Вихідники — `assets/logos/src/`.
 3. **«[04] Послуги»** (`section.story.sv`, дані `STEPS`): підшипник із `meridian-3d`, що грає сам, коли блок на екрані.
    - Креслення `bearing-l.webp` відкривається (0,2–1,8 с) з лінією відсотків, смуга від центру проявляє рендер
      `bearing.webp` (1,8–2,9 с), далі відео WebM VP9 з альфою (`bearing-1600.webm`, на ≤ 899 px — `bearing-960.webm`,
@@ -157,8 +159,8 @@ python tools/v2_assets.py          # усе; або brands | parts | video
 python tools/build_v2.py           # v1.html → index.html
 ```
 
-- `v2_assets.py logos` робить з `assets/logos/src/*` одноколірні `logo-*.webp` (білий фон вибито; для Väderstad і BEDNAR —
-  за яскравістю, бо там світлий напис на темній плашці / темний на жовтій) і кольорові `logo-*-c.webp`, розміри — `logos.json`.
+- `v2_assets.py logos` робить з `assets/logos/src/*` одноколірні `logo-*.webp` (білий фон вибито; для Väderstad, BEDNAR,
+  John Deere й A&I — за яскравістю (поріг 0,62): жовте й світло-зелене вибивається, темне лишається) і кольорові `logo-*-c.webp`, розміри — `logos.json`.
 - `v2_assets.py` бере `assets/bp-*.webp` (фото героя: `bp-*.webp` до 1600 px, `bp-*-800.webp` для телефона,
   `bp-*-320.webp` — мініатюри рядка) і з `C:\Users\Yalad\meridian-3d` — `out/*-poster.png` та кадри
   `frames/hero-bearing/0000–0191.png`. Грейд «чистий, соковитий» (варіант B, обраний 24.09.2026 з чотирьох):
@@ -207,4 +209,5 @@ python tools/build_v2.py           # v1.html → index.html
 | 24.09.2026 | v2 стала головною (`index.html`), v1 → `v1.html`, `v2.html` перенаправляє на головну | `ec0bf86` |
 | 24.09.2026 | Фірмовий ховер: бренди в героях, картка бренду-посилання, «Замовити», футер; «Умови роботи» як картки; іконка «Сервіс» — розвідний ключ; `shoot.py` уміє `HOVER:` | `7e738e5` |
 | 24.09.2026 | Лінії блоку із заголовком вирівняно з рядком виробників; у кнопок виробників без зеленої заливки | `05a5d17` |
-| 24.09.2026 | «[02] Склад»: кнопка «Замовити запчастини» 40 px і на одній лінії з навігацією слайдера (відступ знизу 14 px) | див. git log |
+| 24.09.2026 | «[02] Склад»: кнопка «Замовити запчастини» 40 px і на одній лінії з навігацією слайдера (відступ знизу 14 px) | `24e127a` |
+| 24.09.2026 | Логотипи John Deere, Gates, A&I з офіційних сайтів; назвою лишився тільки AGV | див. git log |
