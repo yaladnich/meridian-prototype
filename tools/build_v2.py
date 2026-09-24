@@ -1,4 +1,4 @@
-"""Збирає v2.html з index.html.
+"""Збирає головну сторінку index.html (v2) з v1.html.
 
 Зміни v2: герой — слайди виробників «ч/б → кольорове фото» з виносками й рядком виробників унизу; під героєм каталог;
 «Послуги» з підшипником «креслення → рендер → відео», кроки змінюються за таймером; ізометричні іконки
@@ -13,7 +13,7 @@ import re
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
-src = (ROOT / 'index.html').read_text(encoding='utf-8')
+src = (ROOT / 'v1.html').read_text(encoding='utf-8')
 
 ARROW = ('<svg width="14" height="14" viewBox="0 0 256 256" fill="currentColor" aria-hidden="true" class="ico">'
          '<path d="M224.49,136.49l-72,72a12,12,0,0,1-17-17L187,140H40a12,12,0,0,1,0-24H187L135.51,64.48a12,12,0,0,1,'
@@ -880,7 +880,7 @@ page = sub1(r'\. Wikimedia Commons, CC BY-SA 3\.0 / 4\.0</div>', lambda _: (
     '<a href="https://commons.wikimedia.org/wiki/File:BEDNAR_logo_2019_RGB.jpg" target="_blank" rel="noopener">Cz-bd-1</a>, '
     '<a href="https://commons.wikimedia.org/wiki/File:OLIMAC_LOGO.png" target="_blank" rel="noopener">Agromacintosh</a>, '
     'Wikimedia Commons, CC BY-SA 4.0. Логотипи виробників — торгові марки їхніх власників.</div>'), page, 2)
-page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · <a class="vlk" href="index.html">прототип v2, перша версія →</a>', page, 2)
+page = sub1(r'© 2026 Meridian Parts', '© 2026 Meridian Parts · <a class="vlk" href="v1.html">перша версія прототипу →</a>', page, 2)
 
-(ROOT / 'v2.html').write_text(page, encoding='utf-8')
-print('v2.html', len(page))
+(ROOT / 'index.html').write_text(page, encoding='utf-8')
+print('index.html', len(page))

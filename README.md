@@ -2,15 +2,15 @@
 
 Прототип дизайну каталогу запчастин для [meridianparts.com.ua](https://www.meridianparts.com.ua/).
 
-Перегляд: https://yaladnich.github.io/meridian-prototype/
+Перша версія: https://yaladnich.github.io/meridian-prototype/v1.html
 
 Пошук за номером або назвою працює по каталогу магазину (1 237 товарів). Кнопки й посилання, окрім пошуку, слайдера та полів форми, — заглушки.
 
 Ціни в картках орієнтовні, за даними інших магазинів, і не є цінами Meridian Parts. Фото виробників — Wikimedia Commons, CC BY-SA 3.0 / 4.0, автори вказані у футері сторінки («Автори фото»).
 
-## Версія 2
+## Версія 2 — головна
 
-Перегляд: https://yaladnich.github.io/meridian-prototype/v2.html
+Головна: https://yaladnich.github.io/meridian-prototype/ (перша версія — /v1.html)
 
 Та сама сторінка з прийомами референсу [heronaiapp.com](https://heronaiapp.com/):
 
@@ -20,9 +20,9 @@
 - «Умови роботи»: ізометричні іконки, що креслять себе;
 - рядок логотипів виробників (одним кольором, кольорові при наведенні; логотипи — торгові марки їхніх власників), координати й приціл у блоці замовлення, зерно паперу.
 
-`v2.html` не редагується вручну, його збирає скрипт з `index.html`:
+`index.html` не редагується вручну, його збирає скрипт з `v1.html`:
 
 ```
 python tools/v2_assets.py   # assets/v2: грейд фото й мініатюри, креслення й рендери деталей, відео (з C:/Users/Yalad/meridian-3d)
-python tools/build_v2.py    # v2.html
+python tools/build_v2.py    # v1.html → index.html
 ```
